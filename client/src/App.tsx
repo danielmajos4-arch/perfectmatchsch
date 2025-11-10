@@ -12,6 +12,8 @@ import Register from "@/pages/Register";
 import Dashboard from "@/pages/Dashboard";
 import TeacherDashboard from "@/pages/TeacherDashboard";
 import SchoolDashboard from "@/pages/SchoolDashboard";
+import TeacherOnboarding from "@/pages/onboarding/TeacherOnboarding";
+import SchoolOnboarding from "@/pages/onboarding/SchoolOnboarding";
 import Jobs from "@/pages/Jobs";
 import JobDetail from "@/pages/JobDetail";
 import Messages from "@/pages/Messages";
@@ -24,6 +26,10 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      
+      {/* Onboarding routes */}
+      <Route path="/onboarding/teacher" component={TeacherOnboarding} />
+      <Route path="/onboarding/school" component={SchoolOnboarding} />
       
       {/* Role-specific dashboard routes */}
       <Route path="/teacher/dashboard">

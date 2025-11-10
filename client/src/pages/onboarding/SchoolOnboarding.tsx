@@ -1,0 +1,286 @@
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'wouter';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, School } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { InsertSchool } from '@shared/schema';
+import { queryClient } from '@/lib/queryClient';
+
+const SCHOOL_TYPES = [
+  'Public',
+  'Private',
+  'Charter',
+  'Montessori',
+  'International',
+  'Online',
+  'Other'
+];
+
+export default function SchoolOnboarding() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [formData, setFormData] = useState({
+    school_name: '',
+    school_type: '',
+    location: '',
+    description: '',
+    website: '',
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const saveSchoolMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      if (!user) throw new Error('No user found');
+
+      const schoolData: InsertSchool = {
+        user_id: user.id,
+        school_name: data.school_name,
+        school_type: data.school_type,
+        location: data.location,
+        description: data.description,
+        website: data.website || null,
+        profile_complete: true,
+      };
+
+      const { data: existingSchool } = await supabase
+        .from('schools')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (existingSchool) {
+        const { error } = await supabase
+          .from('schools')
+          .update(schoolData)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('schools')
+          .insert([schoolData]);
+
+        if (error) throw error;
+      }
+
+      return schoolData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['school-profile'] });
+      setLocation('/school/dashboard');
+    },
+    onError: (error: any) => {
+      console.error('Error saving school profile:', error);
+      setErrors({ submit: 'Failed to save profile. Please try again.' });
+    },
+  });
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.school_name.trim()) newErrors.school_name = 'School name is required';
+    if (!formData.school_type) newErrors.school_type = 'School type is required';
+    if (!formData.location.trim()) newErrors.location = 'Location is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (formData.description.length < 50) {
+      newErrors.description = 'Description must be at least 50 characters';
+    }
+    
+    if (formData.website && !formData.website.match(/^https?:\/\/.+/)) {
+      newErrors.website = 'Website must start with http:// or https://';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      saveSchoolMutation.mutate(formData);
+    }
+  };
+
+  if (!user) {
+    setLocation('/login');
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background py-8 px-4">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="text-center space-y-2">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-primary/10 rounded-full">
+              <School className="h-8 w-8 text-primary" data-testid="icon-school" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold" data-testid="text-onboarding-title">
+            Welcome to PerfectMatchSchools
+          </h1>
+          <p className="text-muted-foreground" data-testid="text-onboarding-subtitle">
+            Create your school profile to start posting jobs and connecting with teachers
+          </p>
+        </div>
+
+        {errors.submit && (
+          <Alert variant="destructive" data-testid="alert-error">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{errors.submit}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle data-testid="text-step-title">School Profile</CardTitle>
+            <CardDescription data-testid="text-step-description">
+              Tell us about your school and what makes it special
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <Label htmlFor="school_name" data-testid="label-school-name">
+                  School Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="school_name"
+                  data-testid="input-school-name"
+                  value={formData.school_name}
+                  onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
+                  placeholder="Enter school name"
+                  className={errors.school_name ? 'border-destructive' : ''}
+                />
+                {errors.school_name && (
+                  <p className="text-sm text-destructive mt-1" data-testid="error-school-name">
+                    {errors.school_name}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="school_type" data-testid="label-school-type">
+                  School Type <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.school_type}
+                  onValueChange={(value) => setFormData({ ...formData, school_type: value })}
+                >
+                  <SelectTrigger
+                    data-testid="select-school-type"
+                    className={errors.school_type ? 'border-destructive' : ''}
+                  >
+                    <SelectValue placeholder="Select school type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCHOOL_TYPES.map((type) => (
+                      <SelectItem key={type} value={type} data-testid={`option-type-${type.toLowerCase()}`}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.school_type && (
+                  <p className="text-sm text-destructive mt-1" data-testid="error-school-type">
+                    {errors.school_type}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="location" data-testid="label-location">
+                  Location <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="location"
+                  data-testid="input-location"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="City, State"
+                  className={errors.location ? 'border-destructive' : ''}
+                />
+                {errors.location && (
+                  <p className="text-sm text-destructive mt-1" data-testid="error-location">
+                    {errors.location}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="description" data-testid="label-description">
+                  Description <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  data-testid="textarea-description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Describe your school's culture, mission, and values..."
+                  rows={6}
+                  className={errors.description ? 'border-destructive' : ''}
+                />
+                <div className="flex justify-between mt-1">
+                  {errors.description ? (
+                    <p className="text-sm text-destructive" data-testid="error-description">
+                      {errors.description}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground" data-testid="text-description-count">
+                      {formData.description.length} characters (minimum 50)
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="website" data-testid="label-website">
+                  Website <span className="text-muted-foreground text-sm">(Optional)</span>
+                </Label>
+                <Input
+                  id="website"
+                  data-testid="input-website"
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  placeholder="https://www.example.com"
+                  className={errors.website ? 'border-destructive' : ''}
+                />
+                {errors.website && (
+                  <p className="text-sm text-destructive mt-1" data-testid="error-website">
+                    {errors.website}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={saveSchoolMutation.isPending}
+                  data-testid="button-submit"
+                >
+                  {saveSchoolMutation.isPending ? (
+                    <>
+                      <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Complete Profile'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
