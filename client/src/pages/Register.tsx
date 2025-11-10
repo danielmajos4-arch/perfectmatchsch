@@ -22,6 +22,25 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (formData.password.length < 6) {
+      toast({
+        title: 'Invalid password',
+        description: 'Password must be at least 6 characters long.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!formData.role) {
+      toast({
+        title: 'Role required',
+        description: 'Please select whether you are a teacher or school.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -60,11 +79,9 @@ export default function Register() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <Link href="/">
-            <a className="flex items-center gap-2 mb-4">
-              <GraduationCap className="h-10 w-10 text-primary" />
-              <span className="text-2xl font-bold text-foreground">PerfectMatchSchools</span>
-            </a>
+          <Link href="/" className="flex items-center gap-2 mb-4">
+            <GraduationCap className="h-10 w-10 text-primary" />
+            <span className="text-2xl font-bold text-foreground">PerfectMatchSchools</span>
           </Link>
           <p className="text-muted-foreground text-center">
             Join thousands of educators and schools
@@ -118,10 +135,11 @@ export default function Register() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a strong password"
+                  placeholder="Create a strong password (min. 6 characters)"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
+                  minLength={6}
                   className="h-12"
                   data-testid="input-password"
                 />
@@ -160,10 +178,8 @@ export default function Register() {
           <CardFooter className="flex flex-col gap-4 p-0 mt-6">
             <p className="text-sm text-center text-muted-foreground">
               Already have an account?{' '}
-              <Link href="/login">
-                <a className="text-primary font-medium hover:underline" data-testid="link-login">
-                  Sign in
-                </a>
+              <Link href="/login" className="text-primary font-medium hover:underline" data-testid="link-login">
+                Sign in
               </Link>
             </p>
             <p className="text-xs text-center text-muted-foreground">

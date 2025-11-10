@@ -49,11 +49,9 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <Link href="/">
-            <a className="flex items-center gap-2 mb-4">
-              <GraduationCap className="h-10 w-10 text-primary" />
-              <span className="text-2xl font-bold text-foreground">PerfectMatchSchools</span>
-            </a>
+          <Link href="/" className="flex items-center gap-2 mb-4">
+            <GraduationCap className="h-10 w-10 text-primary" />
+            <span className="text-2xl font-bold text-foreground">PerfectMatchSchools</span>
           </Link>
           <p className="text-muted-foreground text-center">
             Connect with teaching opportunities that match your passion
@@ -114,10 +112,8 @@ export default function Login() {
           <CardFooter className="flex flex-col gap-4 p-0 mt-6">
             <p className="text-sm text-center text-muted-foreground">
               Don't have an account?{' '}
-              <Link href="/register">
-                <a className="text-primary font-medium hover:underline" data-testid="link-register">
-                  Create account
-                </a>
+              <Link href="/register" className="text-primary font-medium hover:underline" data-testid="link-register">
+                Create account
               </Link>
             </p>
             <p className="text-xs text-center text-muted-foreground">
