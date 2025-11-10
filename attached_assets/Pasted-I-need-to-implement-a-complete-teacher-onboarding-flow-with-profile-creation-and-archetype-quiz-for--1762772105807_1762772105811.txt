@@ -1,0 +1,418 @@
+I need to implement a complete teacher onboarding flow with profile creation and archetype quiz for PerfectMatchSchools.
+
+═══════════════════════════════════════════════════════
+DATABASE SCHEMA (CONFIRMED):
+═══════════════════════════════════════════════════════
+
+TEACHERS TABLE:
+- id, user_id, full_name, email, phone, location, bio
+- years_experience, subjects (array), grade_levels (array), certifications (array)
+- archetype (text/enum), quiz_result (jsonb), profile_complete (boolean)
+- teaching_philosophy, resume_url, profile_photo_url, portfolio_url
+
+QUIZ TABLES:
+- archetype_quiz_questions: question_id, question, question_order
+- archetype_quiz_options: id, question_id, text, scores (jsonb)
+- quiz_with_options: (view that joins questions + options)
+
+USER_ARCHETYPES TABLE:
+- id, user_id, archetype_name, archetype_description
+- strengths (array), growth_areas (array), ideal_environments (array), teaching_style
+
+QUIZ STRUCTURE:
+- 8 questions total (q1 through q8)
+- Each question has 4 answer options
+- Each option has scores (0-3) for different archetypes
+
+AVAILABLE ARCHETYPES (based on quiz scoring):
+1. Leader - Takes charge, organizes, establishes clear expectations
+2. Innovator - Tries new approaches, experiments with technology
+3. Mentor - Provides one-on-one support, understands individual needs
+4. Advocate - Equity-focused, considers systemic issues
+5. Collaborator - Team-oriented, peer-focused
+6. Specialist - Content-deep, standards-focused
+
+ARCHETYPE MAPPING (quiz scores → user_archetypes names):
+- mentor → "The Guide"
+- innovator → "The Trailblazer"
+- advocate → "The Changemaker"
+- collaborator → "The Connector"
+- specialist → "The Explorer"
+- leader → "The Leader" (or map to existing archetype)
+
+SCHOOLS TABLE:
+- id, user_id, school_name, school_type, location, description
+- website, logo_url, profile_complete (boolean)
+
+═══════════════════════════════════════════════════════
+REQUIREMENTS:
+═══════════════════════════════════════════════════════
+
+1. AUTHENTICATION & ROUTING LOGIC:
+   After login/signup via Supabase Auth:
+   - Check user's role from profiles table (role: 'teacher' or 'school')
+   - TEACHERS: 
+     * If profile_complete = false OR archetype IS NULL → redirect to /teacher/onboarding
+     * If profile_complete = true AND archetype exists → allow /teacher/dashboard
+   - SCHOOLS:
+     * If profile_complete = false → redirect to /school/onboarding  
+     * If profile_complete = true → allow /school/dashboard
+
+2. TEACHER ONBOARDING FLOW (Multi-step):
+
+   ┌─────────────────────────────────────────────┐
+   │ STEP 1: BASIC PROFILE FORM                  │
+   └─────────────────────────────────────────────┘
+   Create a form with these fields:
+   - full_name* (text input)
+   - phone* (text input with formatting)
+   - location* (text input or dropdown)
+   - bio (textarea, 200-500 chars)
+   - years_experience* (number input or dropdown: 0-1, 2-5, 6-10, 11-15, 16+)
+   - subjects* (multi-select checkboxes or dropdown):
+     Options: Math, Science, English, History, Social Studies, Art, Music, PE, Special Ed, ESL, Technology, Other
+   - grade_levels* (multi-select checkboxes):
+     Options: Pre-K, K, 1-2, 3-5, 6-8, 9-12, College
+   - teaching_philosophy (optional textarea)
+   
+   On submit:
+   - Save data to teachers table using Supabase client
+   - Keep profile_complete = false (not done yet)
+   - Navigate to Step 2 (quiz)
+
+   ┌─────────────────────────────────────────────┐
+   │ STEP 2: ARCHETYPE QUIZ (8 QUESTIONS)        │
+   └─────────────────────────────────────────────┘
+   
+   A. Fetch quiz data:
+```javascript
+   const { data: quizData, error } = await supabase
+     .from('quiz_with_options')
+     .select('*')
+     .order('question_order');
+```
+   
+   B. Display quiz UI:
+   - Show questions one at a time (recommended) OR all on one scrollable page
+   - Progress indicator: "Question 1 of 8", "Question 2 of 8", etc. OR progress bar showing 12.5%, 25%, 37.5%...
+   - For each question:
+     * Display question text prominently
+     * Show 4 radio button options (styled as cards or buttons for better UX)
+     * Require selection before moving to next question
+   - Navigation: "Previous" and "Next" buttons
+   - Last question: "Previous" and "Submit Quiz" buttons
+   - Store selected answers in state: { questionId: optionId }
+   
+   C. Calculate archetype on submit:
+```javascript
+   // Initialize score tallies
+   const archetypeScores = {
+     leader: 0,
+     innovator: 0, 
+     mentor: 0,
+     advocate: 0,
+     collaborator: 0,
+     specialist: 0
+   };
+   
+   // Loop through selected answers and tally scores
+   Object.entries(selectedAnswers).forEach(([questionId, selectedOptionId]) => {
+     // Find the selected option from quizData
+     const question = quizData.find(q => q.question_id === questionId);
+     const selectedOption = question.options.find(opt => opt.id === selectedOptionId);
+     
+     // Add scores from this option to totals
+     Object.entries(selectedOption.scores).forEach(([archetype, score]) => {
+       archetypeScores[archetype] += score;
+     });
+   });
+   
+   // Find archetype with highest score
+   const topArchetype = Object.keys(archetypeScores)
+     .reduce((a, b) => archetypeScores[a] > archetypeScores[b] ? a : b);
+   
+   // Map quiz archetype to user_archetypes table name
+   const archetypeMapping = {
+     mentor: "The Guide",
+     innovator: "The Trailblazer",
+     advocate: "The Changemaker",
+     collaborator: "The Connector",
+     specialist: "The Explorer",
+     leader: "The Leader" // or choose appropriate mapping
+   };
+   
+   const finalArchetypeName = archetypeMapping[topArchetype];
+```
+   
+   D. Save results to database:
+```javascript
+   // 1. Update teachers table with quiz results
+   const { error: updateError } = await supabase
+     .from('teachers')
+     .update({
+       quiz_result: selectedAnswers, // Store all question-answer pairs
+       archetype: finalArchetypeName, // e.g., "The Guide"
+       profile_complete: true // Mark profile as complete
+     })
+     .eq('user_id', user.id);
+   
+   if (updateError) {
+     console.error('Error saving quiz results:', updateError);
+     // Show error message to user
+     return;
+   }
+   
+   // 2. Fetch archetype details from user_archetypes table
+   const { data: archetypeInfo, error: fetchError } = await supabase
+     .from('user_archetypes')
+     .select('*')
+     .eq('archetype_name', finalArchetypeName)
+     .limit(1)
+     .single();
+```
+   
+   E. Show results page (transition to Step 3):
+   - Celebrate with animation or confetti effect
+   - Display archetype name in large, prominent text
+   - Show archetype icon/badge if available
+   - Display archetype_description
+   - List strengths (bullet points)
+   - List ideal_environments
+   - "Continue to Dashboard" button → navigate to /teacher/dashboard
+
+3. SCHOOL ONBOARDING FLOW (Single step):
+
+   Create a form with these fields:
+   - school_name* (text input)
+   - school_type* (dropdown: Public, Private, Charter, Montessori, International, Online, Other)
+   - location* (text input - city, state format)
+   - description* (textarea - describe school culture, mission, values)
+   - website (text input with URL validation, optional)
+   - logo_url (file upload to Supabase Storage bucket 'school-logos', optional)
+   
+   On submit:
+   - If logo file exists, upload to Supabase Storage first
+   - Save all data to schools table
+   - Set profile_complete = true
+   - Redirect to /school/dashboard
+
+4. PROFILE COMPLETION GUARD (ProtectedRoute Component):
+
+   Create a reusable component that protects dashboard routes:
+```javascript
+   import { useEffect, useState } from 'react';
+   import { Navigate } from 'react-router-dom';
+   import { supabase } from '@/lib/supabaseClient';
+   
+   function ProtectedRoute({ children, requiredRole }) {
+     const [user, setUser] = useState(null);
+     const [profile, setProfile] = useState(null);
+     const [loading, setLoading] = useState(true);
+     
+     useEffect(() => {
+       async function checkAuth() {
+         // Get current authenticated user
+         const { data: { user: authUser } } = await supabase.auth.getUser();
+         
+         if (!authUser) {
+           setLoading(false);
+           return;
+         }
+         
+         setUser(authUser);
+         
+         // Fetch profile based on role
+         if (requiredRole === 'teacher') {
+           const { data } = await supabase
+             .from('teachers')
+             .select('profile_complete, archetype')
+             .eq('user_id', authUser.id)
+             .single();
+           
+           setProfile(data);
+         } else if (requiredRole === 'school') {
+           const { data } = await supabase
+             .from('schools')
+             .select('profile_complete')
+             .eq('user_id', authUser.id)
+             .single();
+           
+           setProfile(data);
+         }
+         
+         setLoading(false);
+       }
+       
+       checkAuth();
+     }, [requiredRole]);
+     
+     if (loading) {
+       return <div className="flex items-center justify-center min-h-screen">
+         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+       </div>;
+     }
+     
+     if (!user) {
+       return <Navigate to="/login" replace />;
+     }
+     
+     // Check if profile is incomplete
+     if (!profile || !profile.profile_complete) {
+       return <Navigate to={`/${requiredRole}/onboarding`} replace />;
+     }
+     
+     // For teachers, also check archetype
+     if (requiredRole === 'teacher' && !profile.archetype) {
+       return <Navigate to="/teacher/onboarding" replace />;
+     }
+     
+     return children;
+   }
+   
+   export default ProtectedRoute;
+```
+   
+   Apply to routes in App.jsx:
+```javascript
+   <Route 
+     path="/teacher/dashboard" 
+     element={
+       <ProtectedRoute requiredRole="teacher">
+         <TeacherDashboard />
+       </ProtectedRoute>
+     } 
+   />
+   
+   <Route 
+     path="/school/dashboard" 
+     element={
+       <ProtectedRoute requiredRole="school">
+         <SchoolDashboard />
+       </ProtectedRoute>
+     } 
+   />
+```
+
+═══════════════════════════════════════════════════════
+TECHNICAL REQUIREMENTS:
+═══════════════════════════════════════════════════════
+
+- Use React + React Router v6 for navigation
+- Use Supabase client (@supabase/supabase-js) for all database operations
+- Use TailwindCSS + shadcn/ui components:
+  * Button, Input, Textarea, Select, RadioGroup
+  * Card, Label, Progress
+  * Alert (for error messages)
+- Mobile-responsive design:
+  * Forms should stack vertically on mobile
+  * Use Tailwind breakpoints (sm:, md:, lg:)
+  * Test on mobile viewport (375px width)
+- Form validation:
+  * Required field indicators (*)
+  * Show error messages below fields
+  * Disable submit button until form is valid
+- Loading states:
+  * Show spinner during API calls
+  * Disable buttons while loading
+  * Use LoadingSpinner component or Tailwind animations
+- Error handling:
+  * Try-catch blocks around all Supabase calls
+  * Display user-friendly error messages
+  * Log technical errors to console
+- State management:
+  * Use useState for form data and quiz answers
+  * Use useEffect for data fetching
+  * Clear state after successful submission
+- Navigation:
+  * Use useNavigate() hook for programmatic navigation
+  * Use Navigate component for redirects
+
+═══════════════════════════════════════════════════════
+FILE STRUCTURE:
+═══════════════════════════════════════════════════════
+
+/src
+  /components
+    /onboarding
+      TeacherProfileForm.jsx       // Step 1 of teacher onboarding
+      ArchetypeQuiz.jsx             // Step 2: Quiz component (8 questions)
+      ArchetypeResults.jsx          // Step 3: Display archetype results
+      SchoolProfileForm.jsx         // School onboarding form
+    /ui (shadcn components)
+      Button.jsx
+      Input.jsx
+      Select.jsx
+      RadioGroup.jsx
+      Card.jsx
+      Progress.jsx
+    ProtectedRoute.jsx              // Auth guard for dashboard routes
+    LoadingSpinner.jsx              // Reusable loading component
+  /pages
+    /teacher
+      TeacherOnboarding.jsx         // Orchestrates Steps 1-3
+      TeacherDashboard.jsx          // Protected dashboard
+    /school
+      SchoolOnboarding.jsx          // School profile form page
+      SchoolDashboard.jsx           // Protected dashboard
+    LoginPage.jsx
+  /lib
+    supabaseClient.js               // Supabase client initialization
+  /utils
+    archetypeMapping.js             // Quiz score → archetype name mapping
+  App.jsx                           // Main app with routes
+  main.jsx                          // Entry point
+
+═══════════════════════════════════════════════════════
+DETAILED IMPLEMENTATION NOTES:
+═══════════════════════════════════════════════════════
+
+QUIZ UX RECOMMENDATIONS:
+1. Display one question at a time (better mobile experience)
+2. Style answer options as cards with hover effects
+3. Show visual feedback when option is selected
+4. Include progress bar at top (1/8, 2/8... or 12.5%, 25%...)
+5. Disable "Next" button until answer is selected
+6. Allow users to go back and change previous answers
+7. Show loading spinner when calculating results
+8. Celebrate results with animation (confetti.js or framer-motion)
+
+FORM VALIDATION EXAMPLES:
+- Phone: Regex for (XXX) XXX-XXXX format
+- Email: Standard email validation
+- URL: Check for http:// or https://
+- Multi-select: Ensure at least one option selected
+- Textarea: Min/max character counts with counter
+
+ERROR HANDLING EXAMPLES:
+```javascript
+try {
+  const { data, error } = await supabase.from('teachers').insert(formData);
+  if (error) throw error;
+  // Success - navigate to next step
+} catch (error) {
+  console.error('Database error:', error);
+  setErrorMessage('Failed to save profile. Please try again.');
+}
+```
+
+ARCHETYPE CALCULATION EDGE CASES:
+- Handle tie scores (choose first archetype alphabetically, or show both)
+- Validate that all questions were answered
+- Store both top archetype AND secondary archetype for future use
+
+═══════════════════════════════════════════════════════
+DELIVERABLES:
+═══════════════════════════════════════════════════════
+
+✓ Complete teacher onboarding flow (profile + 8-question quiz + results)
+✓ Complete school onboarding flow (profile form)
+✓ Archetype quiz with accurate scoring logic for 6 archetypes
+✓ Beautiful archetype results page with full details
+✓ Profile completion guards on all dashboard routes
+✓ Mobile-responsive UI that works on phones and tablets
+✓ Working Supabase integration with error handling
+✓ Loading states and user feedback throughout
+✓ Form validation with clear error messages
+✓ Clean, maintainable code with reusable components
+
+Please implement this complete onboarding system. Make it production-ready with proper error handling, accessibility (ARIA labels, keyboard navigation), and polished UX. The quiz experience should feel engaging and professional, and the results should make teachers excited about their archetype.
