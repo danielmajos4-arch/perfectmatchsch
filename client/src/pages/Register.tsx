@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { GraduationCap } from 'lucide-react';
+import logoUrl from '@assets/New logo-15_1762774603259.png';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Register() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -19,6 +19,18 @@ export default function Register() {
     fullName: '',
     role: '',
   });
+
+  // Read role from URL query parameter on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roleParam = urlParams.get('role');
+    if (roleParam === 'teacher' || roleParam === 'school') {
+      setFormData(prev => ({ ...prev, role: roleParam }));
+    }
+  }, [location]);
+
+  // Determine if role is locked (set from URL)
+  const isRoleLocked = formData.role === 'teacher' || formData.role === 'school';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +53,29 @@ export default function Register() {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast({
+        title: 'Invalid email',
+        description: 'Please enter a valid email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Optional: Warn schools about non-educational domains (but don't block)
+    if (formData.role === 'school') {
+      const educationalDomains = ['.edu', '.ac.', '.school', '.k12.'];
+      const hasEducationalDomain = educationalDomains.some(domain => 
+        formData.email.toLowerCase().includes(domain)
+      );
+      if (!hasEducationalDomain) {
+        // Just a warning, not blocking
+        console.log('School email does not appear to be from an educational domain');
+      }
+    }
+
     setIsLoading(true);
 
     try {
@@ -55,20 +90,51 @@ export default function Register() {
         },
       });
 
-      if (authError) throw authError;
+      // Only throw error if there's an actual backend error
+      if (authError) {
+        throw authError;
+      }
 
+      // If signup succeeded (user was created)
       if (authData.user) {
+        // Show success message
         toast({
           title: 'Account created!',
           description: 'Welcome to PerfectMatchSchools. Please check your email to verify your account.',
         });
-        setLocation('/dashboard');
+
+        // Redirect based on role
+        // Give a small delay to ensure toast is visible
+        setTimeout(() => {
+          if (formData.role === 'school') {
+            setLocation('/onboarding/school');
+          } else if (formData.role === 'teacher') {
+            setLocation('/onboarding/teacher');
+          } else {
+            // Fallback to generic dashboard (which will redirect based on role)
+            setLocation('/dashboard');
+          }
+        }, 500);
+      } else {
+        // This shouldn't happen, but handle it gracefully
+        throw new Error('User creation failed. Please try again.');
       }
     } catch (error: any) {
+      // Always show error to user if we catch an error
+      // This means the backend signup failed
+      const errorMessage = error?.message || 'Something went wrong. Please try again.';
+      
       toast({
         title: 'Registration failed',
-        description: error.message || 'Something went wrong. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
+      });
+      
+      // Log error for debugging
+      console.error('Registration error:', {
+        message: error?.message,
+        code: error?.code,
+        status: error?.status,
       });
     } finally {
       setIsLoading(false);
@@ -79,9 +145,16 @@ export default function Register() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <Link href="/" className="flex items-center gap-2 mb-4">
-            <GraduationCap className="h-10 w-10 text-primary" />
-            <span className="text-2xl font-bold text-foreground">PerfectMatchSchools</span>
+          <Link href="/" className="mb-4" data-testid="link-home">
+            <img 
+              src={logoUrl} 
+              alt="PerfectMatchSchools" 
+              className="h-28 w-auto drop-shadow-2xl" 
+              style={{ 
+                filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
+                transform: 'scale(1.08)'
+              }}
+            />
           </Link>
           <p className="text-muted-foreground text-center">
             Join thousands of educators and schools
@@ -96,14 +169,19 @@ export default function Register() {
 
           <CardContent className="p-0">
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Name/School Name Field - Conditional based on role */}
               <div className="space-y-2">
                 <Label htmlFor="fullName" className="text-sm font-medium">
-                  Full Name
+                  {formData.role === 'school' ? 'School Name' : 'Full Name'}
                 </Label>
                 <Input
                   id="fullName"
                   type="text"
-                  placeholder="John Doe"
+                  placeholder={
+                    formData.role === 'school' 
+                      ? 'Enter your school/institution name'
+                      : 'Enter your full name'
+                  }
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   required
@@ -112,22 +190,33 @@ export default function Register() {
                 />
               </div>
 
+              {/* Email Field - Conditional label and placeholder based on role */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
-                  Email
+                  {formData.role === 'school' ? 'School Email' : 'Email'}
                 </Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={
+                    formData.role === 'school'
+                      ? 'admin@yourschool.edu'
+                      : 'your.email@example.com'
+                  }
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
                   className="h-12"
                   data-testid="input-email"
                 />
+                {formData.role === 'school' && (
+                  <p className="text-xs text-muted-foreground">
+                    Please use an official school email address
+                  </p>
+                )}
               </div>
 
+              {/* Password Field */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium">
                   Password
@@ -145,6 +234,7 @@ export default function Register() {
                 />
               </div>
 
+              {/* Role Field - Disabled if set from URL */}
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-sm font-medium">
                   I am a
@@ -153,6 +243,7 @@ export default function Register() {
                   value={formData.role}
                   onValueChange={(value) => setFormData({ ...formData, role: value })}
                   required
+                  disabled={isRoleLocked}
                 >
                   <SelectTrigger className="h-12" data-testid="select-role">
                     <SelectValue placeholder="Select your role" />
@@ -162,6 +253,11 @@ export default function Register() {
                     <SelectItem value="school">School</SelectItem>
                   </SelectContent>
                 </Select>
+                {isRoleLocked && (
+                  <p className="text-xs text-muted-foreground">
+                    Role is set based on your selection
+                  </p>
+                )}
               </div>
 
               <Button

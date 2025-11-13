@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase Connection Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-card h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Supabase Connection Test</h1>
+    <p>This page tests your Supabase connection and verifies the setup.</p>
+
+    <div class="test-card">
+        <h2>1. Environment Variables</h2>
+        <div id="env-status" class="status info">Checking...</div>
+        <button onclick="testEnv()">Test Environment Variables</button>
+    </div>
+
+    <div class="test-card">
+        <h2>2. Supabase Client Initialization</h2>
+        <div id="client-status" class="status info">Not tested</div>
+        <button onclick="testClient()">Test Client Init</button>
+    </div>
+
+    <div class="test-card">
+        <h2>3. Database Tables</h2>
+        <div id="tables-status" class="status info">Not tested</div>
+        <button onclick="testTables()">Test Tables</button>
+    </div>
+
+    <div class="test-card">
+        <h2>4. Authentication</h2>
+        <div id="auth-status" class="status info">Not tested</div>
+        <button onclick="testAuth()">Test Auth Endpoint</button>
+    </div>
+
+    <div class="test-card">
+        <h2>5. RLS Policies</h2>
+        <div id="rls-status" class="status info">Not tested</div>
+        <button onclick="testRLS()">Test RLS</button>
+    </div>
+
+    <script type="module">
+        // Import Supabase client (this will only work if running in the app)
+        // For standalone testing, we'll use fetch API
+        
+        window.testEnv = function() {
+            const status = document.getElementById('env-status');
+            const url = import.meta.env?.VITE_SUPABASE_URL || 'Not found';
+            const key = import.meta.env?.VITE_SUPABASE_ANON_KEY ? 'Set ✓' : 'Not found';
+            
+            if (url !== 'Not found' && key === 'Set ✓') {
+                status.className = 'status success';
+                status.innerHTML = `✅ Environment variables loaded<br>URL: ${url.substring(0, 30)}...<br>Key: ${key}`;
+            } else {
+                status.className = 'status error';
+                status.innerHTML = `❌ Missing environment variables<br>URL: ${url}<br>Key: ${key}`;
+            }
+        };
+
+        window.testClient = async function() {
+            const status = document.getElementById('client-status');
+            status.className = 'status info';
+            status.textContent = 'Testing...';
+            
+            try {
+                // Try to import and use Supabase client
+                const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+                const url = import.meta.env?.VITE_SUPABASE_URL;
+                const key = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+                
+                if (!url || !key) {
+                    throw new Error('Environment variables not set');
+                }
+                
+                const supabase = createClient(url, key);
+                status.className = 'status success';
+                status.textContent = '✅ Supabase client initialized successfully';
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = `❌ Client initialization failed: ${error.message}`;
+            }
+        };
+
+        window.testTables = async function() {
+            const status = document.getElementById('tables-status');
+            status.className = 'status info';
+            status.textContent = 'Testing...';
+            
+            try {
+                const url = import.meta.env?.VITE_SUPABASE_URL;
+                const key = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+                
+                if (!url || !key) {
+                    throw new Error('Environment variables not set');
+                }
+                
+                // Test if we can query tables (this will fail if RLS blocks, but that's ok)
+                const response = await fetch(`${url}/rest/v1/users?select=count`, {
+                    headers: {
+                        'apikey': key,
+                        'Authorization': `Bearer ${key}`
+                    }
+                });
+                
+                if (response.ok || response.status === 200 || response.status === 406) {
+                    status.className = 'status success';
+                    status.textContent = '✅ Can connect to Supabase API (tables may require auth)';
+                } else {
+                    status.className = 'status error';
+                    status.textContent = `❌ Connection failed: ${response.status} ${response.statusText}`;
+                }
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = `❌ Table test failed: ${error.message}`;
+            }
+        };
+
+        window.testAuth = async function() {
+            const status = document.getElementById('auth-status');
+            status.className = 'status info';
+            status.textContent = 'Testing...';
+            
+            try {
+                const url = import.meta.env?.VITE_SUPABASE_URL;
+                const key = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+                
+                if (!url || !key) {
+                    throw new Error('Environment variables not set');
+                }
+                
+                // Test auth endpoint
+                const response = await fetch(`${url}/auth/v1/health`, {
+                    headers: {
+                        'apikey': key
+                    }
+                });
+                
+                if (response.ok) {
+                    status.className = 'status success';
+                    status.textContent = '✅ Authentication endpoint is accessible';
+                } else {
+                    status.className = 'status error';
+                    status.textContent = `❌ Auth endpoint failed: ${response.status}`;
+                }
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = `❌ Auth test failed: ${error.message}`;
+            }
+        };
+
+        window.testRLS = async function() {
+            const status = document.getElementById('rls-status');
+            status.className = 'status info';
+            status.textContent = '⚠️ RLS testing requires authenticated user. Test manually in the app.';
+        };
+
+        // Auto-run env test on load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(testEnv, 100);
+        });
+    </script>
+</body>
+</html>
+

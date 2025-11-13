@@ -58,42 +58,42 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Apply for Position</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-xl md:text-2xl">Apply for Position</DialogTitle>
+          <DialogDescription className="text-sm">
             Submit your application for this teaching position
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Job Summary */}
-          <Card className="p-4 border rounded-lg">
-            <div className="flex items-start gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+          {/* Job Summary - Mobile First */}
+          <Card className="p-3 sm:p-4 border rounded-lg">
+            <div className="flex items-start gap-3 sm:gap-4">
               {job.school_logo ? (
                 <img
                   src={job.school_logo}
                   alt={job.school_name}
-                  className="h-12 w-12 rounded-lg object-cover"
+                  className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg object-cover flex-shrink-0"
                 />
               ) : (
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <span className="text-lg font-semibold text-primary">
+                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-base sm:text-lg font-semibold text-primary">
                     {job.school_name.charAt(0)}
                   </span>
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-foreground text-lg truncate">
+                <h3 className="font-semibold text-foreground text-base sm:text-lg break-words">
                   {job.title}
                 </h3>
-                <p className="text-sm text-muted-foreground">{job.school_name}</p>
-                <p className="text-sm text-muted-foreground">{job.location}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{job.school_name}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{job.location}</p>
               </div>
             </div>
           </Card>
 
-          {/* Cover Letter */}
+          {/* Cover Letter - Mobile Optimized */}
           <div className="space-y-2">
             <Label htmlFor="coverLetter" className="text-sm font-medium">
               Cover Letter <span className="text-destructive">*</span>
@@ -104,7 +104,7 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
               value={coverLetter}
               onChange={(e) => setCoverLetter(e.target.value)}
               required
-              className="min-h-32 resize-none"
+              className="min-h-32 resize-none text-base"
               data-testid="textarea-coverletter"
             />
             <p className="text-xs text-muted-foreground">
@@ -112,12 +112,13 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
             </p>
           </div>
 
-          <DialogFooter className="flex gap-3 justify-end">
+          <DialogFooter className="flex-col sm:flex-row gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
               disabled={applyMutation.isPending}
+              className="w-full sm:w-auto h-11 order-2 sm:order-1"
               data-testid="button-cancel"
             >
               Cancel
@@ -125,6 +126,7 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
             <Button
               type="submit"
               disabled={applyMutation.isPending || !coverLetter.trim()}
+              className="w-full sm:w-auto h-11 order-1 sm:order-2"
               data-testid="button-submit-application"
             >
               {applyMutation.isPending ? 'Submitting...' : 'Submit Application'}

@@ -27,9 +27,18 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
+  // Explicitly set envDir to project root to ensure .env files are loaded
+  // Vite looks for .env files relative to this directory
+  envDir: path.resolve(import.meta.dirname),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+  },
+  css: {
+    // PostCSS config is automatically loaded from postcss.config.js in the project root
+    // Explicitly configuring it here ensures proper integration and prevents warnings
+    postcss: path.resolve(import.meta.dirname, "postcss.config.js"),
+    devSourcemap: true,
   },
   server: {
     fs: {

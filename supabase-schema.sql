@@ -32,6 +32,65 @@ CREATE TABLE IF NOT EXISTS public.jobs (
   is_active BOOLEAN DEFAULT TRUE NOT NULL
 );
 
+-- Teachers table (detailed teacher profiles)
+-- Drop existing table if it exists without user_id column
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'teachers') THEN
+    -- Check if user_id column exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'teachers' AND column_name = 'user_id') THEN
+      DROP TABLE IF EXISTS public.teachers CASCADE;
+    END IF;
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.teachers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  location TEXT NOT NULL,
+  bio TEXT,
+  years_experience TEXT NOT NULL,
+  subjects TEXT[] NOT NULL,
+  grade_levels TEXT[] NOT NULL,
+  certifications TEXT[],
+  archetype TEXT,
+  quiz_result JSONB,
+  profile_complete BOOLEAN DEFAULT FALSE NOT NULL,
+  teaching_philosophy TEXT,
+  resume_url TEXT,
+  profile_photo_url TEXT,
+  portfolio_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
+-- Schools table (detailed school profiles)
+-- Drop existing table if it exists without user_id column
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'schools') THEN
+    -- Check if user_id column exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'user_id') THEN
+      DROP TABLE IF EXISTS public.schools CASCADE;
+    END IF;
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.schools (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+  school_name TEXT NOT NULL,
+  school_type TEXT NOT NULL,
+  location TEXT NOT NULL,
+  description TEXT NOT NULL,
+  website TEXT,
+  logo_url TEXT,
+  profile_complete BOOLEAN DEFAULT FALSE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+);
+
 -- Applications table
 CREATE TABLE IF NOT EXISTS public.applications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -65,6 +124,16 @@ CREATE TABLE IF NOT EXISTS public.messages (
 );
 
 -- Create indexes for better query performance
+-- Only create indexes if tables exist with the correct columns
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'teachers' AND column_name = 'user_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_teachers_user_id ON public.teachers(user_id);
+  END IF;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'schools' AND column_name = 'user_id') THEN
+    CREATE INDEX IF NOT EXISTS idx_schools_user_id ON public.schools(user_id);
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_jobs_school_id ON public.jobs(school_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_is_active ON public.jobs(is_active);
 CREATE INDEX IF NOT EXISTS idx_applications_job_id ON public.applications(job_id);
@@ -78,6 +147,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_sent_at ON public.messages(sent_at);
 
 -- Enable RLS on all tables
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
@@ -92,6 +163,36 @@ CREATE POLICY "Users can insert their own profile" ON public.users
 
 CREATE POLICY "Users can update their own profile" ON public.users
   FOR UPDATE USING (auth.uid() = id);
+
+-- Teachers policies
+-- Drop existing policies first to avoid conflicts
+DROP POLICY IF EXISTS "Users can view all teacher profiles" ON public.teachers;
+DROP POLICY IF EXISTS "Teachers can insert their own profile" ON public.teachers;
+DROP POLICY IF EXISTS "Teachers can update their own profile" ON public.teachers;
+
+CREATE POLICY "Users can view all teacher profiles" ON public.teachers
+  FOR SELECT USING (true);
+
+CREATE POLICY "Teachers can insert their own profile" ON public.teachers
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Teachers can update their own profile" ON public.teachers
+  FOR UPDATE USING (auth.uid() = user_id);
+
+-- Schools policies
+-- Drop existing policies first to avoid conflicts
+DROP POLICY IF EXISTS "Users can view all school profiles" ON public.schools;
+DROP POLICY IF EXISTS "Schools can insert their own profile" ON public.schools;
+DROP POLICY IF EXISTS "Schools can update their own profile" ON public.schools;
+
+CREATE POLICY "Users can view all school profiles" ON public.schools
+  FOR SELECT USING (true);
+
+CREATE POLICY "Schools can insert their own profile" ON public.schools
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Schools can update their own profile" ON public.schools
+  FOR UPDATE USING (auth.uid() = user_id);
 
 -- Jobs policies
 CREATE POLICY "Anyone can view active jobs" ON public.jobs

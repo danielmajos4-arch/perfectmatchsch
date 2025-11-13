@@ -18,26 +18,35 @@
   --sidebar: 0 0% 96%;
   --sidebar-foreground: 0 0% 9%;
   --sidebar-border: 0 0% 92%;
-  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary: 331 82% 45%;
   --sidebar-primary-foreground: 0 0% 98%;
   --sidebar-accent: 0 0% 92%;
   --sidebar-accent-foreground: 0 0% 9%;
-  --sidebar-ring: 217 91% 60%;
+  --sidebar-ring: 331 82% 45%;
   --popover: 0 0% 94%;
   --popover-foreground: 0 0% 9%;
   --popover-border: 0 0% 90%;
-  --primary: 217 91% 60%;
+  --primary: 331 82% 45%;
   --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 90%;
+  --secondary: 187 100% 42%;
   --secondary-foreground: 0 0% 9%;
   --muted: 0 0% 92%;
   --muted-foreground: 0 0% 45%;
-  --accent: 217 15% 88%;
+  --accent: 14 100% 60%;
   --accent-foreground: 0 0% 9%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
   --input: 0 0% 75%;
-  --ring: 217 91% 60%;
+  --ring: 331 82% 45%;
+  --success: 122 39% 49%;
+  --success-foreground: 0 0% 98%;
+  --warning: 45 100% 51%;
+  --warning-foreground: 0 0% 9%;
+  --brand-cyan: 187 100% 42%;
+  --brand-magenta: 331 82% 45%;
+  --brand-orange: 14 100% 60%;
+  --brand-yellow: 45 100% 51%;
+  --brand-green: 122 39% 49%;
   --chart-1: 217 91% 45%;
   --chart-2: 142 76% 36%;
   --chart-3: 280 70% 45%;
@@ -102,26 +111,36 @@
   --sidebar: 0 0% 13%;
   --sidebar-foreground: 0 0% 98%;
   --sidebar-border: 0 0% 16%;
-  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary: 331 82% 45%;
   --sidebar-primary-foreground: 0 0% 98%;
   --sidebar-accent: 0 0% 16%;
   --sidebar-accent-foreground: 0 0% 98%;
-  --sidebar-ring: 217 91% 60%;
+  --sidebar-ring: 331 82% 45%;
   --popover: 0 0% 15%;
   --popover-foreground: 0 0% 98%;
   --popover-border: 0 0% 18%;
-  --primary: 217 91% 60%;
+  --primary: 331 82% 45%;
   --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 18%;
-  --secondary-foreground: 0 0% 98%;
+  --primary-on-dark: 331 82% 68%;
+  --secondary: 187 100% 42%;
+  --secondary-foreground: 0 0% 9%;
   --muted: 0 0% 17%;
   --muted-foreground: 0 0% 65%;
-  --accent: 217 15% 20%;
-  --accent-foreground: 0 0% 98%;
+  --accent: 14 100% 60%;
+  --accent-foreground: 0 0% 9%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
   --input: 0 0% 30%;
-  --ring: 217 91% 60%;
+  --ring: 331 82% 45%;
+  --success: 122 39% 49%;
+  --success-foreground: 0 0% 98%;
+  --warning: 45 100% 51%;
+  --warning-foreground: 0 0% 9%;
+  --brand-cyan: 187 100% 42%;
+  --brand-magenta: 331 82% 45%;
+  --brand-orange: 14 100% 60%;
+  --brand-yellow: 45 100% 51%;
+  --brand-green: 122 39% 49%;
   --chart-1: 217 91% 70%;
   --chart-2: 142 76% 65%;
   --chart-3: 280 70% 70%;
@@ -172,6 +191,28 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+  }
+
+  /* Enhanced focus styles for accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Smooth transitions for interactive elements */
+  button, a, [role="button"] {
+    @apply transition-all duration-200 ease-in-out;
+  }
+
+  /* Better text rendering */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Improved link styles */
+  a {
+    @apply transition-colors duration-200;
   }
 }
 
@@ -284,5 +325,149 @@
   .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
+  }
+
+  /* Enhanced card hover effects */
+  .card-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .card-hover:hover {
+    @apply shadow-lg -translate-y-1;
+    transform: translateY(-4px) scale(1.01);
+  }
+
+  /* Smooth fade-in animations */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  /* Stagger animation for lists */
+  @keyframes staggerFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-stagger {
+    animation: staggerFadeIn 0.5s ease-out;
+  }
+
+  /* Pulse animation for loading states */
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Shimmer effect for skeleton loaders */
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      to right,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.5) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  /* Smooth scale on interaction */
+  .scale-on-hover {
+    @apply transition-transform duration-200 ease-out;
+  }
+
+  .scale-on-hover:hover {
+    @apply scale-105;
+  }
+
+  .scale-on-active:active {
+    @apply scale-95;
+  }
+
+  /* Gradient text animation */
+  @keyframes gradient-shift {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .gradient-text-animated {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--brand-cyan)),
+      hsl(var(--brand-magenta)),
+      hsl(var(--brand-orange)),
+      hsl(var(--brand-cyan))
+    );
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  /* Smooth page transitions */
+  .page-transition {
+    @apply animate-fade-in;
+  }
+
+  /* Enhanced button ripple effect */
+  .ripple {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ripple::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+  }
+
+  .ripple:active::after {
+    width: 300px;
+    height: 300px;
   }
 }

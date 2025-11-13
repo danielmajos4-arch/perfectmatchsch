@@ -26,9 +26,14 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  // Ensure envDir is set to project root so .env files are loaded
+  const projectRoot = path.resolve(import.meta.dirname, "..");
+
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
+    // Explicitly set envDir to ensure .env files are loaded from project root
+    envDir: projectRoot,
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {

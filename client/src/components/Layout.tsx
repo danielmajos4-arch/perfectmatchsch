@@ -1,55 +1,40 @@
 import { ReactNode } from 'react';
-import { Link } from 'wouter';
-import { MobileNav } from './MobileNav';
-import { GraduationCap } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { AuthenticatedLayout } from './AuthenticatedLayout';
+import { PublicLayout } from './PublicLayout';
 
 interface LayoutProps {
   children: ReactNode;
   showMobileNav?: boolean;
 }
 
+/**
+ * Layout Component
+ * 
+ * Conditionally renders AuthenticatedLayout or PublicLayout based on auth state
+ * This is a wrapper that delegates to the appropriate layout
+ */
 export function Layout({ children, showMobileNav = false }: LayoutProps) {
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Desktop Header */}
-      <header className="hidden md:block sticky top-0 z-50 bg-card border-b border-card-border">
-        <div className="max-w-6xl mx-auto px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-xl font-semibold text-foreground hover-elevate active-elevate-2 px-3 py-2 rounded-lg">
-            <GraduationCap className="h-6 w-6 text-primary" />
-            <span>PerfectMatchSchools</span>
-          </Link>
-          
-          <nav className="flex items-center gap-6">
-            <Link href="/jobs" className="text-sm font-medium text-foreground hover-elevate active-elevate-2 px-3 py-2 rounded-lg" data-testid="link-jobs">
-              Find Jobs
-            </Link>
-            <Link href="/messages" className="text-sm font-medium text-foreground hover-elevate active-elevate-2 px-3 py-2 rounded-lg" data-testid="link-messages">
-              Messages
-            </Link>
-            <Link href="/profile" className="text-sm font-medium text-foreground hover-elevate active-elevate-2 px-3 py-2 rounded-lg" data-testid="link-profile">
-              Profile
-            </Link>
-          </nav>
+  const { user, loading } = useAuth();
+  const isAuthenticated = !!user;
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
         </div>
-      </header>
+      </div>
+    );
+  }
 
-      {/* Mobile Header */}
-      <header className="md:hidden sticky top-0 z-50 bg-card border-b border-card-border">
-        <div className="px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <GraduationCap className="h-6 w-6 text-primary" />
-            <span>PerfectMatch</span>
-          </Link>
-        </div>
-      </header>
+  // Use AuthenticatedLayout for logged-in users
+  if (isAuthenticated) {
+    return <AuthenticatedLayout showMobileNav={showMobileNav}>{children}</AuthenticatedLayout>;
+  }
 
-      {/* Main Content */}
-      <main className={showMobileNav ? 'pb-16 md:pb-0' : ''}>
-        {children}
-      </main>
-
-      {/* Mobile Navigation */}
-      {showMobileNav && <MobileNav />}
-    </div>
-  );
+  // Use PublicLayout for unauthenticated users
+  return <PublicLayout>{children}</PublicLayout>;
 }

@@ -9,6 +9,7 @@ import { RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import RoleSelection from "@/pages/RoleSelection";
 import Dashboard from "@/pages/Dashboard";
 import TeacherDashboard from "@/pages/TeacherDashboard";
 import SchoolDashboard from "@/pages/SchoolDashboard";
@@ -18,13 +19,21 @@ import Jobs from "@/pages/Jobs";
 import JobDetail from "@/pages/JobDetail";
 import Messages from "@/pages/Messages";
 import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
+import { ServiceWorkerUpdate, OfflineIndicator } from "@/components/ServiceWorkerUpdate";
+import { PWATestPanel } from "@/components/PWATestPanel";
+import { EmailTestPanel } from "@/components/EmailTestPanel";
+// Import debug utilities to make them available globally
+import "@/utils/debugDatabase";
+import "@/utils/verifyProfileSave";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
+      <Route path="/role-selection" component={RoleSelection} />
       <Route path="/register" component={Register} />
       
       {/* Onboarding routes */}
@@ -54,13 +63,18 @@ function Router() {
           <Messages />
         </ProtectedRoute>
       </Route>
-      <Route path="/profile">
-        <ProtectedRoute>
-          <Profile />
-        </ProtectedRoute>
-      </Route>
-      
-      <Route component={NotFound} />
+            <Route path="/profile">
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            </Route>
+            <Route path="/settings">
+              <ProtectedRoute>
+                <Settings />
+              </ProtectedRoute>
+            </Route>
+            
+            <Route component={NotFound} />
     </Switch>
   );
 }
@@ -72,6 +86,14 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          {/* Service Worker Update Prompt */}
+          <ServiceWorkerUpdate />
+          {/* Offline Indicator */}
+          <OfflineIndicator />
+          {/* PWA Test Panel (Development Only) */}
+          <PWATestPanel />
+          {/* Email Test Panel (Development Only) */}
+          <EmailTestPanel />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

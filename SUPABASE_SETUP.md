@@ -16,7 +16,34 @@
 
 ### 2. Configure Environment Variables
 
-The following environment variables are already set in your Replit Secrets:
+You need to set the following environment variables:
+
+- `VITE_SUPABASE_URL`: Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous/public key
+
+#### For Local Development:
+
+1. Create a `.env` file in the project root directory (same level as `package.json`)
+2. Add the following variables:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+3. Get these values from your Supabase project:
+   - Go to https://supabase.com/dashboard
+   - Select your project
+   - Navigate to **Settings** → **API**
+   - Copy the **Project URL** (under "Project URL")
+   - Copy the **anon public** key (under "Project API keys")
+4. Restart your development server after adding the variables
+
+**Important:** 
+- Vite requires environment variables to be prefixed with `VITE_` to be exposed to the client
+- Never commit your `.env` file` to version control (it should be in `.gitignore`)
+
+#### For Replit:
+
+The following environment variables should be set in your Replit Secrets:
 - `VITE_SUPABASE_URL`: Your Supabase project URL
 - `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous/public key
 

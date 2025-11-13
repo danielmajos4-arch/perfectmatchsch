@@ -9,10 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, School } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { InsertSchool } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
+import logoUrl from '@assets/New logo-15_1762774603259.png';
 
 const SCHOOL_TYPES = [
   'Public',
@@ -119,11 +120,17 @@ export default function SchoolOnboarding() {
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
-            <div className="p-3 bg-primary/10 rounded-full">
-              <School className="h-8 w-8 text-primary" data-testid="icon-school" />
-            </div>
+            <img 
+              src={logoUrl} 
+              alt="PerfectMatchSchools" 
+              className="h-24 w-auto drop-shadow-2xl" 
+              style={{ 
+                filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
+                transform: 'scale(1.08)'
+              }}
+            />
           </div>
-          <h1 className="text-3xl font-bold" data-testid="text-onboarding-title">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent" data-testid="text-onboarding-title">
             Welcome to PerfectMatchSchools
           </h1>
           <p className="text-muted-foreground" data-testid="text-onboarding-subtitle">

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Layout } from '@/components/Layout';
+import { useLocation } from 'wouter';
+import { AuthenticatedLayout } from '@/components/AuthenticatedLayout';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Send, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { queryClient } from '@/lib/queryClient';
@@ -16,14 +17,28 @@ type ConversationWithUsers = Conversation & {
   teacher: User;
   school: User;
   messages: Message[];
+  teacher_profile?: { profile_photo_url: string | null; full_name: string } | null;
+  school_profile?: { logo_url: string | null; school_name: string } | null;
 };
 
 export default function Messages() {
   const { toast } = useToast();
+  const [location] = useLocation();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check for conversation ID in URL query params
+  useEffect(() => {
+    const params = new URLSearchParams(location.split('?')[1]);
+    const conversationId = params.get('conversation');
+    if (conversationId) {
+      setSelectedConversation(conversationId);
+      // Clean up URL
+      window.history.replaceState({}, '', '/messages');
+    }
+  }, [location]);
 
   const { data: user } = useQuery({
     queryKey: ['/api/auth/user'],
@@ -41,7 +56,14 @@ export default function Messages() {
 
       const { data, error } = await supabase
         .from('conversations')
-        .select('*, teacher:users!teacher_id(*), school:users!school_id(*), messages(*)')
+        .select(`
+          *, 
+          teacher:users!teacher_id(*), 
+          school:users!school_id(*), 
+          messages(*),
+          teacher_profile:teachers!teacher_id(profile_photo_url, full_name),
+          school_profile:schools!school_id(logo_url, school_name)
+        `)
         .eq(field, user?.id)
         .order('last_message_at', { ascending: false });
 
@@ -89,6 +111,64 @@ export default function Messages() {
     sendMessageMutation.mutate();
   };
 
+  // Real-time subscription for messages
+  useEffect(() => {
+    if (!selectedConversation || !user?.id) return;
+
+    const channel = supabase
+      .channel(`conversation:${selectedConversation}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${selectedConversation}`,
+        },
+        (payload) => {
+          // Invalidate queries to refetch messages
+          queryClient.invalidateQueries({ queryKey: ['/api/conversations', user.id] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${selectedConversation}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['/api/conversations', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversation, user?.id]);
+
+  // Mark messages as read when conversation is selected
+  useEffect(() => {
+    if (!selectedConversation || !user?.id) return;
+
+    const unreadMessages = selectedConv?.messages?.filter(
+      (msg) => !msg.is_read && msg.sender_id !== user.id
+    );
+
+    if (unreadMessages && unreadMessages.length > 0) {
+      const messageIds = unreadMessages.map((msg) => msg.id);
+      supabase
+        .from('messages')
+        .update({ is_read: true })
+        .in('id', messageIds)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/conversations', user.id] });
+        });
+    }
+  }, [selectedConversation, selectedConv, user?.id]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedConv?.messages]);
@@ -102,6 +182,16 @@ export default function Messages() {
     return user?.user_metadata?.role === 'teacher' ? conv.school : conv.teacher;
   };
 
+  const getOtherUserPhoto = (conv: ConversationWithUsers) => {
+    if (user?.user_metadata?.role === 'teacher') {
+      // If teacher, show school logo
+      return conv.school_profile?.logo_url || null;
+    } else {
+      // If school, show teacher profile photo
+      return conv.teacher_profile?.profile_photo_url || null;
+    }
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -112,7 +202,7 @@ export default function Messages() {
   };
 
   return (
-    <Layout showMobileNav>
+    <AuthenticatedLayout showMobileNav>
       <div className="h-[calc(100vh-4rem)] md:h-[calc(100vh-4rem)] flex flex-col md:flex-row max-w-6xl mx-auto">
         {/* Conversations List */}
         <div
@@ -147,33 +237,44 @@ export default function Messages() {
               filteredConversations.map((conv) => {
                 const otherUser = getOtherUser(conv);
                 const lastMessage = conv.messages?.[conv.messages.length - 1];
+                const unreadCount = conv.messages?.filter(
+                  (msg) => !msg.is_read && msg.sender_id !== user?.id
+                ).length || 0;
 
                 return (
                   <button
                     key={conv.id}
                     onClick={() => setSelectedConversation(conv.id)}
-                    className={`w-full p-4 flex gap-3 hover-elevate border-b border-card-border text-left ${
+                    className={`w-full p-4 flex gap-3 hover-elevate border-b border-card-border text-left relative ${
                       selectedConversation === conv.id ? 'bg-muted' : ''
-                    }`}
+                    } ${unreadCount > 0 ? 'bg-primary/5' : ''}`}
                     data-testid={`conversation-${conv.id}`}
                   >
                     <Avatar className="h-12 w-12">
+                      <AvatarImage src={getOtherUserPhoto(conv) || undefined} alt={otherUser.full_name} />
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                         {getInitials(otherUser.full_name)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-foreground truncate">
+                        <span className={`font-semibold truncate ${unreadCount > 0 ? 'text-foreground font-bold' : 'text-foreground'}`}>
                           {otherUser.full_name}
                         </span>
+                        <div className="flex items-center gap-2">
+                          {unreadCount > 0 && (
+                            <span className="bg-primary text-primary-foreground text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                              {unreadCount}
+                            </span>
+                          )}
                         {lastMessage && (
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(lastMessage.sent_at), { addSuffix: true })}
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground truncate">
+                      </div>
+                      <p className={`text-sm truncate ${unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                         {lastMessage?.content || 'No messages yet'}
                       </p>
                     </div>
@@ -204,6 +305,7 @@ export default function Messages() {
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Avatar className="h-10 w-10">
+                  <AvatarImage src={getOtherUserPhoto(selectedConv) || undefined} alt={getOtherUser(selectedConv).full_name} />
                   <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                     {getInitials(getOtherUser(selectedConv).full_name)}
                   </AvatarFallback>
@@ -288,6 +390,6 @@ export default function Messages() {
           )}
         </div>
       </div>
-    </Layout>
+    </AuthenticatedLayout>
   );
 }

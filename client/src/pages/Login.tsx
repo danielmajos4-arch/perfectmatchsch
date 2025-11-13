@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap } from 'lucide-react';
+import logoUrl from '@assets/New logo-15_1762774603259.png';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 
@@ -49,9 +49,16 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <Link href="/" className="flex items-center gap-2 mb-4">
-            <GraduationCap className="h-10 w-10 text-primary" />
-            <span className="text-2xl font-bold text-foreground">PerfectMatchSchools</span>
+          <Link href="/" className="mb-4" data-testid="link-home">
+            <img 
+              src={logoUrl} 
+              alt="PerfectMatchSchools" 
+              className="h-28 w-auto drop-shadow-2xl" 
+              style={{ 
+                filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
+                transform: 'scale(1.08)'
+              }}
+            />
           </Link>
           <p className="text-muted-foreground text-center">
             Connect with teaching opportunities that match your passion

@@ -13,6 +13,7 @@ export interface Job {
   id: string;
   school_id: string;
   title: string;
+  department: string;
   subject: string;
   grade_level: string;
   job_type: string;
@@ -25,6 +26,7 @@ export interface Job {
   school_logo: string | null;
   posted_at: string;
   is_active: boolean;
+  archetype_tags?: string[]; // Added for Sprint 6 matching
 }
 
 export interface Application {
@@ -64,6 +66,7 @@ export interface InsertUser {
 export interface InsertJob {
   school_id: string;
   title: string;
+  department: string;
   subject: string;
   grade_level: string;
   job_type: string;
@@ -74,6 +77,7 @@ export interface InsertJob {
   benefits: string;
   school_name: string;
   school_logo?: string | null;
+  archetype_tags?: string[]; // Added for Sprint 6 matching
 }
 
 export interface InsertApplication {
@@ -108,6 +112,7 @@ export interface Teacher {
   grade_levels: string[];
   certifications: string[] | null;
   archetype: string | null;
+  archetype_tags?: string[]; // Added for Sprint 6 matching
   quiz_result: Record<string, string> | null;
   profile_complete: boolean;
   teaching_philosophy: string | null;
@@ -130,6 +135,9 @@ export interface InsertTeacher {
   certifications?: string[] | null;
   teaching_philosophy?: string | null;
   profile_complete?: boolean;
+  profile_photo_url?: string | null;
+  resume_url?: string | null;
+  portfolio_url?: string | null;
 }
 
 // School profile interfaces
@@ -189,3 +197,28 @@ export interface UserArchetype {
   ideal_environments: string[];
   teaching_style: string;
 }
+
+export interface SavedSearch {
+  id: string;
+  user_id: string;
+  name: string;
+  search_query: string | null;
+  filters: Record<string, any>;
+  is_active: boolean;
+  notify_on_match: boolean;
+  last_checked_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SearchHistory {
+  id: string;
+  user_id: string;
+  search_query: string | null;
+  filters: Record<string, any>;
+  result_count: number;
+  searched_at: string;
+}
+
+// Export matching types
+export * from './matching';

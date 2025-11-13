@@ -26,12 +26,71 @@ export function ArchetypeQuiz({ quizData, onComplete, onBack, loading }: Archety
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
   const canGoNext = answers[currentQuestion?.question_id];
   
+  // Debug logging
+  useEffect(() => {
+    console.log('=== ARCHETYPE QUIZ DEBUG ===');
+    console.log('Quiz Data Summary:', {
+      totalQuestions,
+      currentQuestionIndex,
+      allQuestions: quizData.map(q => ({
+        question_id: q.question_id,
+        question: q.question?.substring(0, 40) + '...',
+        optionsCount: q.options?.length || 0
+      }))
+    });
+    
+    if (currentQuestion) {
+      console.log('Current Question Details:', {
+        question_id: currentQuestion.question_id,
+        question: currentQuestion.question,
+        optionsCount: currentQuestion.options?.length || 0,
+        options: currentQuestion.options?.map((o: any) => ({
+          id: o.id,
+          text: o.text?.substring(0, 50) + '...',
+          hasScores: !!o.scores
+        })) || []
+      });
+      
+      // CRITICAL: Check if options exist
+      if (!currentQuestion.options || currentQuestion.options.length === 0) {
+        console.error('❌ CRITICAL: Current question has NO OPTIONS!');
+        console.error('Question:', currentQuestion);
+      } else {
+        console.log('✅ Current question has', currentQuestion.options.length, 'options');
+      }
+    } else {
+      console.warn('⚠️ No current question available');
+    }
+  }, [quizData, currentQuestionIndex, currentQuestion, totalQuestions]);
+  
   if (totalQuestions === 0) {
     return (
       <Alert variant="destructive" data-testid="alert-no-questions">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           No quiz questions available. Please contact support.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  if (!currentQuestion) {
+    return (
+      <Alert variant="destructive" data-testid="alert-quiz-error">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Unable to load quiz questions. Please try again.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  if (!currentQuestion.options || currentQuestion.options.length === 0) {
+    return (
+      <Alert variant="destructive" data-testid="alert-no-options">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          No answer options available for this question. Please contact support.
         </AlertDescription>
       </Alert>
     );
@@ -100,9 +159,13 @@ export function ArchetypeQuiz({ quizData, onComplete, onBack, loading }: Archety
             onValueChange={handleAnswerSelect}
             className="space-y-3"
           >
-            {currentQuestion.options.map((option: QuizOption, index: number) => (
+            {currentQuestion.options && currentQuestion.options.length > 0 ? (
+              currentQuestion.options
+                .filter((option: QuizOption) => option && option.id && option.text) // Filter out invalid options
+                .map((option: QuizOption, index: number) => {
+                  return (
               <Card
-                key={option.id}
+                      key={`${currentQuestion.question_id}-${option.id}-${index}`}
                 className={`cursor-pointer transition-all hover-elevate ${
                   answers[currentQuestion.question_id] === option.id
                     ? 'border-primary bg-primary/5'
@@ -113,19 +176,28 @@ export function ArchetypeQuiz({ quizData, onComplete, onBack, loading }: Archety
                 <CardContent className="flex items-start space-x-3 p-4">
                   <RadioGroupItem
                     value={option.id}
-                    id={option.id}
+                          id={`${option.id}-${index}`}
                     data-testid={`radio-option-${index + 1}`}
-                    className="mt-0.5"
+                          className="mt-0.5 flex-shrink-0"
                   />
                   <Label
-                    htmlFor={option.id}
-                    className="flex-1 cursor-pointer font-normal text-base"
+                          htmlFor={`${option.id}-${index}`}
+                          className="flex-1 cursor-pointer font-normal text-base leading-relaxed"
                   >
                     {option.text}
                   </Label>
                 </CardContent>
               </Card>
-            ))}
+                  );
+                })
+            ) : (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No answer options available for this question. Please check the database.
+                </AlertDescription>
+              </Alert>
+            )}
           </RadioGroup>
 
           {error && (
