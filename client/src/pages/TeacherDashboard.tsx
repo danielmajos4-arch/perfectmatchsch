@@ -20,7 +20,7 @@ import { ArchetypeBadge } from '@/components/ArchetypeBadge';
 import { NextStepsWidget } from '@/components/NextStepsWidget';
 import { ArchetypeGrowthResources } from '@/components/ArchetypeGrowthResources';
 import { JobCard } from '@/components/JobCard';
-import { AchievementCollection, AchievementNotification } from '@/components/achievements';
+import { AchievementCollection, AchievementNotification, AchievementBadge } from '@/components/achievements';
 import { useAchievements } from '@/hooks/useAchievements';
 import { ApplicationTimeline } from '@/components/ApplicationTimeline';
 import { EmptyState } from '@/components/EmptyState';
@@ -28,6 +28,7 @@ import { useLocation } from 'wouter';
 import type { Application, Job, Teacher, Conversation } from '@shared/schema';
 import type { TeacherJobMatch } from '@shared/matching';
 import { formatDistanceToNow } from 'date-fns';
+import { ProfileCompletionGate } from '@/components/ProfileCompletionGate';
 
 type ApplicationWithJob = Application & { job: Job };
 
@@ -60,6 +61,36 @@ export default function TeacherDashboard() {
 
   const { toast } = useToast();
   const [selectedTab, setSelectedTab] = useState('applications');
+
+  // Handle hash routes
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === '#applications') {
+      setSelectedTab('applications');
+      setTimeout(() => {
+        const element = document.getElementById('applications');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else if (hash === '#favorites') {
+      setSelectedTab('favorites');
+      setTimeout(() => {
+        const element = document.getElementById('favorites');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else if (hash === '#matches') {
+      setSelectedTab('matches');
+      setTimeout(() => {
+        const element = document.getElementById('matches');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, []);
 
   // Get teacher profile to access archetype_tags
   const { data: teacherProfile } = useQuery<Teacher>({
@@ -281,7 +312,7 @@ export default function TeacherDashboard() {
     return <Badge variant={config.variant} className="rounded-full">{config.label}</Badge>;
   };
 
-  return (
+  const content = (
     <AuthenticatedLayout>
       {/* Achievement Notification */}
       <AchievementNotification
@@ -364,6 +395,59 @@ export default function TeacherDashboard() {
                   showRewards={true}
                 />
               </div>
+            )}
+            
+            {/* Achievements Stats Card */}
+            {achievements.length > 0 && user?.id && (
+              <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border-yellow-200 dark:border-yellow-800">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Award className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                      Achievements
+                    </CardTitle>
+                    <Badge variant="secondary" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                      {achievements.length}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {achievements.slice(0, 6).map((achievement) => (
+                        <AchievementBadge
+                          key={achievement.id}
+                          achievement={achievement}
+                          size="sm"
+                          unlocked={true}
+                        />
+                      ))}
+                      {achievements.length > 6 && (
+                        <Link href="/profile#achievements">
+                          <Badge variant="outline" className="h-8 px-3 cursor-pointer hover:bg-primary/10">
+                            +{achievements.length - 6} more
+                          </Badge>
+                        </Link>
+                      )}
+                    </div>
+                    {stats && (
+                      <div className="pt-2 border-t border-yellow-200 dark:border-yellow-800">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Total Points</span>
+                          <span className="font-semibold text-yellow-700 dark:text-yellow-300">
+                            {stats.totalPoints || 0}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    <Link href="/profile#achievements">
+                      <Button variant="outline" size="sm" className="w-full mt-2">
+                        View All Achievements
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Archetype Badge - Middle Column */}
@@ -461,7 +545,7 @@ export default function TeacherDashboard() {
               </TabsList>
 
               <TabsContent value="applications" className="space-y-4 mt-0">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-border">
+                <div id="applications" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-border">
                   <div>
                     <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-1">Your Applications</h2>
                     <p className="text-sm text-muted-foreground">Track the status of your job applications</p>
@@ -504,7 +588,7 @@ export default function TeacherDashboard() {
 
               {/* Matched Jobs Tab */}
               <TabsContent value="matches" className="space-y-4 mt-0">
-                <div className="mb-6 pb-4 border-b border-border">
+                <div id="matches" className="mb-6 pb-4 border-b border-border">
                   <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Matched Jobs</h2>
                   <p className="text-sm text-muted-foreground">Jobs matched to your teaching archetype and preferences</p>
                 </div>
@@ -566,7 +650,7 @@ export default function TeacherDashboard() {
 
           {/* Favorites Tab */}
               <TabsContent value="favorites" className="space-y-4 mt-0">
-                <div className="mb-6 pb-4 border-b border-border">
+                <div id="favorites" className="mb-6 pb-4 border-b border-border">
                   <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Favorited Jobs</h2>
                   <p className="text-sm text-muted-foreground">Jobs you've saved for later</p>
                 </div>
@@ -631,5 +715,11 @@ export default function TeacherDashboard() {
         </div>
       </div>
     </AuthenticatedLayout>
+  );
+
+  return (
+    <ProfileCompletionGate>
+      {content}
+    </ProfileCompletionGate>
   );
 }

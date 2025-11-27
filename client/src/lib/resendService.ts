@@ -1,50 +1,100 @@
-// Resend API service for email notifications (Sprint 6)
-// Configure RESEND_API_KEY in your .env file
+/**
+ * Resend API Service for Email Notifications
+ * 
+ * Handles email sending via server-side endpoint to avoid CORS issues.
+ * The server handles all Resend API communication.
+ */
 
-const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY || '';
-const RESEND_FROM_EMAIL = import.meta.env.VITE_RESEND_FROM_EMAIL || 'noreply@perfectmatchschools.com';
+const RESEND_FROM_EMAIL = import.meta.env.VITE_RESEND_FROM_EMAIL || import.meta.env.VITE_FROM_EMAIL || 'noreply@perfectmatchschools.com';
+const RESEND_SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'support@perfectmatchschools.com';
 
-interface EmailOptions {
+export interface EmailOptions {
   to: string | string[];
   subject: string;
   html: string;
+  text?: string;
+  replyTo?: string;
   from?: string;
+  tags?: Array<{ name: string; value: string }>;
+}
+
+export interface EmailResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
 }
 
 /**
- * Send email via Resend API
+ * Send email via server-side endpoint (avoids CORS issues)
+ * The server handles all Resend API communication
  */
-export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
-  if (!RESEND_API_KEY) {
-    console.warn('Resend API key not configured. Email sending disabled.');
-    return { success: false, error: 'Resend API key not configured' };
-  }
-
+export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
   try {
-    const response = await fetch('https://api.resend.com/emails', {
+    // Call YOUR server endpoint, not Resend directly
+    const response = await fetch('/api/send-email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: options.from || RESEND_FROM_EMAIL,
         to: Array.isArray(options.to) ? options.to : [options.to],
         subject: options.subject,
         html: options.html,
-      }),
+        text: options.text,
+        replyTo: options.replyTo || RESEND_SUPPORT_EMAIL,
+        from: options.from || RESEND_FROM_EMAIL,
+        tags: options.tags || []
+      })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to send email');
+      const errorMessage = data.error || 'Failed to send email';
+      console.error('[Resend] Server error:', errorMessage);
+      return {
+        success: false,
+        error: errorMessage
+      };
     }
 
-    return { success: true };
+    console.log('[Resend] Email sent successfully:', {
+      to: options.to,
+      subject: options.subject,
+      messageId: data.messageId,
+    });
+
+    return {
+      success: true,
+      messageId: data.messageId
+    };
+
   } catch (error: any) {
-    console.error('Error sending email:', error);
-    return { success: false, error: error.message };
+    console.error('[Resend] Error sending email:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send email'
+    };
   }
+}
+
+/**
+ * Send email using a template
+ */
+export async function sendTemplateEmail(
+  templateId: string,
+  to: string,
+  data: Record<string, any>
+): Promise<EmailResult> {
+  // This would use Resend's template API if available
+  // For now, we'll use the regular sendEmail function
+  // Templates should be rendered before calling this
+  console.warn('[Resend] Template email not fully implemented. Use sendEmail with rendered template.');
+  
+  return {
+    success: false,
+    error: 'Template email not implemented. Use sendEmail with rendered template.',
+  };
 }
 
 /**

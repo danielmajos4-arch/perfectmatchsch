@@ -44,9 +44,25 @@ export function HeroSearch() {
       return;
     }
 
-    // If user is NOT authenticated, redirect to register with role pre-selected
-    const selectedRole = searchType === 'teachers' ? 'teacher' : 'school';
-    setLocation(`/register?role=${selectedRole}`);
+    // If user is NOT authenticated, redirect to register with role & intent pre-selected
+    // If "Find Teachers" tab is active, the user is a school looking for teachers
+    // If "Browse Schools" tab is active, the user is a teacher looking for schools
+    const roleForSearch = searchType === 'teachers' ? 'school' : 'teacher';
+    setLocation(`/register?role=${roleForSearch}&intent=search`);
+  };
+
+  const handleFindTeachersClick = () => {
+    if (!user) {
+      // Non-authenticated user clicking "Find Teachers" should sign up as a school
+      setLocation('/register?role=school&intent=find-teachers');
+    }
+  };
+
+  const handleBrowseSchoolsClick = () => {
+    if (!user) {
+      // Non-authenticated user clicking "Browse Schools" should sign up as a teacher
+      setLocation('/register?role=teacher&intent=browse-schools');
+    }
   };
 
   return (
@@ -56,12 +72,14 @@ export function HeroSearch() {
           <TabsTrigger 
             value="teachers" 
             className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-300 font-medium text-sm md:text-base"
+            onClick={handleFindTeachersClick}
           >
             Find Teachers
           </TabsTrigger>
           <TabsTrigger 
             value="schools"
             className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-300 font-medium text-sm md:text-base"
+            onClick={handleBrowseSchoolsClick}
           >
             Browse Schools
           </TabsTrigger>

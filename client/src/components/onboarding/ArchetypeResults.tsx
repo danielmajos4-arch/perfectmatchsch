@@ -8,9 +8,17 @@ import { useLocation } from 'wouter';
 
 interface ArchetypeResultsProps {
   archetype: UserArchetype;
+  onContinue?: () => void;
+  continueDisabled?: boolean;
+  continueDisabledMessage?: string;
 }
 
-export function ArchetypeResults({ archetype }: ArchetypeResultsProps) {
+export function ArchetypeResults({
+  archetype,
+  onContinue,
+  continueDisabled = false,
+  continueDisabledMessage,
+}: ArchetypeResultsProps) {
   const [, setLocation] = useLocation();
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -21,7 +29,15 @@ export function ArchetypeResults({ archetype }: ArchetypeResultsProps) {
   }, []);
 
   const handleContinue = () => {
-    setLocation('/teacher/dashboard');
+    if (continueDisabled) {
+      return;
+    }
+
+    if (onContinue) {
+      onContinue();
+    } else {
+      setLocation('/teacher/dashboard');
+    }
   };
 
   return (
@@ -117,10 +133,16 @@ export function ArchetypeResults({ archetype }: ArchetypeResultsProps) {
           onClick={handleContinue}
           data-testid="button-continue-dashboard"
           className="px-8"
+          disabled={continueDisabled}
         >
           Continue to Dashboard
         </Button>
       </div>
+      {continueDisabled && continueDisabledMessage && (
+        <p className="text-center text-sm text-destructive" data-testid="text-onboarding-incomplete">
+          {continueDisabledMessage}
+        </p>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 // Provides helper functions for candidate/job matching
 
 import { supabase } from './supabaseClient';
+import { notifyApplicationStatusUpdate } from './notificationService';
 import type { CandidateMatchView, TeacherJobMatch, Job } from '@shared/matching';
 
 /**
@@ -126,12 +127,16 @@ export async function getTeacherJobMatches(
 
   return matches.map(m => ({
     ...m,
-    job: m.job as Job,
+    job: {
+      ...(m.job as Job),
+      job_type: (m.job as any)?.employment_type || (m.job as any)?.job_type || ''
+    } as Job,
   })) as (TeacherJobMatch & { job: Job })[];
 }
 
 /**
  * Update candidate status (for school dashboard)
+ * Also updates application status and sends notification to teacher
  */
 export async function updateCandidateStatus(
   candidateId: string,
@@ -143,6 +148,16 @@ export async function updateCandidateStatus(
     updateData.school_notes = notes;
   }
 
+  // Get candidate data first to find application
+  const { data: candidateData, error: candidateError } = await supabase
+    .from('job_candidates')
+    .select('job_id, teacher_id')
+    .eq('id', candidateId)
+    .single();
+
+  if (candidateError) throw candidateError;
+
+  // Update job_candidates table
   const { data, error } = await supabase
     .from('job_candidates')
     .update(updateData)
@@ -151,6 +166,62 @@ export async function updateCandidateStatus(
     .single();
 
   if (error) throw error;
+
+  // Map candidate status to application status
+  const applicationStatusMap: Record<string, string> = {
+    'new': 'pending',
+    'reviewed': 'under_review',
+    'contacted': 'under_review',
+    'shortlisted': 'under_review',
+    'hired': 'accepted',
+    'hidden': 'rejected',
+  };
+
+  const applicationStatus = applicationStatusMap[status] || 'pending';
+
+  // Update application status and send notification
+  if (candidateData?.teacher_id && candidateData?.job_id) {
+    try {
+      // Find application by job_id and teacher_id
+      const { data: applicationData } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('job_id', candidateData.job_id)
+        .eq('teacher_id', candidateData.teacher_id)
+        .maybeSingle();
+
+      if (applicationData) {
+        // Update application status
+        await supabase
+          .from('applications')
+          .update({ status: applicationStatus })
+          .eq('id', applicationData.id);
+
+        // Get job and teacher info for notification
+        const [jobResult, teacherResult] = await Promise.all([
+          supabase.from('jobs').select('title, school_name').eq('id', candidateData.job_id).single(),
+          supabase.from('teachers').select('full_name').eq('user_id', candidateData.teacher_id).maybeSingle(),
+        ]);
+
+        const job = jobResult.data;
+        const teacher = teacherResult.data;
+
+        if (job && teacher) {
+          // Send notification to teacher about status change
+          await notifyApplicationStatusUpdate(
+            candidateData.teacher_id,
+            applicationData.id,
+            job.title,
+            applicationStatus
+          );
+        }
+      }
+    } catch (notifError) {
+      // Log but don't fail the status update
+      console.error('Error updating application status or sending notification:', notifError);
+    }
+  }
+
   return data;
 }
 
@@ -208,6 +279,11 @@ export async function getJobsByArchetype(
   const { data, error } = await query;
 
   if (error) throw error;
-  return data as Job[];
+  
+  // Map employment_type to job_type for UI consistency
+  return (data || []).map(job => ({
+    ...job,
+    job_type: (job as any).employment_type || (job as any).job_type
+  })) as Job[];
 }
 

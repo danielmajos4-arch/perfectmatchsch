@@ -8,15 +8,33 @@
  * - HTML: Network First with cache fallback
  */
 
+// Service Worker for PerfectMatchSchools PWA
+// Version: Update this when deploying new versions
 const CACHE_VERSION = 'v1.0.0';
+const CACHE_NAME = `perfectmatch-v${CACHE_VERSION}`;
 const STATIC_CACHE = `perfectmatch-static-${CACHE_VERSION}`;
 const API_CACHE = `perfectmatch-api-${CACHE_VERSION}`;
 const IMAGE_CACHE = `perfectmatch-images-${CACHE_VERSION}`;
 const OFFLINE_CACHE = `perfectmatch-offline-${CACHE_VERSION}`;
 
+// Maximum cache size (50MB in bytes)
+const MAX_CACHE_SIZE = 50 * 1024 * 1024;
+
 // Cache expiration times (in milliseconds)
 const IMAGE_CACHE_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
 const API_CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
+// Pre-cache critical assets on install
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/offline.html',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/manifest.json',
+  '/favicon.ico',
+  '/apple-touch-icon.png',
+];
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
@@ -25,18 +43,16 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
       // Cache critical static assets
-      return cache.addAll([
-        '/',
-        '/manifest.json',
-        '/favicon.png',
-        // Add other critical assets as needed
-      ]).catch((err) => {
+      return cache.addAll(urlsToCache).catch((err) => {
         console.warn('[Service Worker] Failed to cache some static assets:', err);
+        // Continue even if some assets fail to cache
       });
+    }).then(() => {
+      console.log('[Service Worker] Pre-cached', urlsToCache.length, 'assets');
     })
   );
   
-  // Force activation of new service worker
+  // Force activation of new service worker immediately
   self.skipWaiting();
 });
 
@@ -45,29 +61,35 @@ self.addEventListener('activate', (event) => {
   console.log('[Service Worker] Activating...', CACHE_VERSION);
   
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((cacheName) => {
-            // Delete old caches that don't match current version
-            return (
-              cacheName.startsWith('perfectmatch-') &&
-              cacheName !== STATIC_CACHE &&
-              cacheName !== API_CACHE &&
-              cacheName !== IMAGE_CACHE &&
-              cacheName !== OFFLINE_CACHE
-            );
-          })
-          .map((cacheName) => {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          })
-      );
-    })
+    Promise.all([
+      // Clean up old caches
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((cacheName) => {
+              // Delete old caches that don't match current version
+              return (
+                cacheName.startsWith('perfectmatch-') &&
+                cacheName !== STATIC_CACHE &&
+                cacheName !== API_CACHE &&
+                cacheName !== IMAGE_CACHE &&
+                cacheName !== OFFLINE_CACHE
+              );
+            })
+            .map((cacheName) => {
+              console.log('[Service Worker] Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            })
+        );
+      }),
+      // Take control of all pages immediately
+      self.clients.claim(),
+      // Clean up expired cache entries
+      cleanupExpiredCaches(),
+    ])
   );
   
-  // Take control of all pages immediately
-  return self.clients.claim();
+  console.log('[Service Worker] Activated and ready');
 });
 
 // Fetch event - implement cache strategies
@@ -349,9 +371,94 @@ async function networkFirstWithOfflineFallback(request) {
   }
 }
 
+// Cleanup expired cache entries
+async function cleanupExpiredCaches() {
+  try {
+    const cacheNames = await caches.keys();
+    const currentCaches = [STATIC_CACHE, API_CACHE, IMAGE_CACHE, OFFLINE_CACHE];
+    
+    for (const cacheName of cacheNames) {
+      if (!currentCaches.includes(cacheName) && cacheName.startsWith('perfectmatch-')) {
+        console.log('[Service Worker] Cleaning up old cache:', cacheName);
+        await caches.delete(cacheName);
+      }
+    }
+    
+    // Check cache sizes and clean up if needed
+    await enforceCacheSizeLimits();
+  } catch (error) {
+    console.error('[Service Worker] Error during cache cleanup:', error);
+  }
+}
+
+// Enforce cache size limits
+async function enforceCacheSizeLimits() {
+  try {
+    let totalSize = 0;
+    const cacheNames = [STATIC_CACHE, API_CACHE, IMAGE_CACHE];
+    
+    for (const cacheName of cacheNames) {
+      const cache = await caches.open(cacheName);
+      const keys = await cache.keys();
+      
+      for (const key of keys) {
+        const response = await cache.match(key);
+        if (response) {
+          const blob = await response.blob();
+          totalSize += blob.size;
+        }
+      }
+    }
+    
+    if (totalSize > MAX_CACHE_SIZE) {
+      console.warn('[Service Worker] Cache size exceeds limit, cleaning up oldest entries');
+      // Remove oldest entries from image cache first (least critical)
+      await cleanupOldestEntries(IMAGE_CACHE, totalSize - MAX_CACHE_SIZE);
+    }
+  } catch (error) {
+    console.error('[Service Worker] Error enforcing cache size limits:', error);
+  }
+}
+
+// Clean up oldest cache entries
+async function cleanupOldestEntries(cacheName, bytesToFree) {
+  try {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    const entries = [];
+    
+    for (const key of keys) {
+      const response = await cache.match(key);
+      if (response) {
+        const blob = await response.blob();
+        const cachedDate = response.headers.get('sw-cached-date');
+        entries.push({
+          key,
+          size: blob.size,
+          date: cachedDate ? parseInt(cachedDate) : 0,
+        });
+      }
+    }
+    
+    // Sort by date (oldest first)
+    entries.sort((a, b) => a.date - b.date);
+    
+    let freed = 0;
+    for (const entry of entries) {
+      if (freed >= bytesToFree) break;
+      await cache.delete(entry.key);
+      freed += entry.size;
+      console.log('[Service Worker] Deleted old cache entry:', entry.key);
+    }
+  } catch (error) {
+    console.error('[Service Worker] Error cleaning up oldest entries:', error);
+  }
+}
+
 // Message handler for cache updates and communication
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[Service Worker] Received SKIP_WAITING message');
     self.skipWaiting();
   }
   
@@ -359,6 +466,21 @@ self.addEventListener('message', (event) => {
     event.waitUntil(
       caches.open(STATIC_CACHE).then((cache) => {
         return cache.addAll(event.data.urls);
+      }).then(() => {
+        console.log('[Service Worker] Cached additional URLs:', event.data.urls);
+      })
+    );
+  }
+  
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => caches.delete(cacheName))
+        );
+      }).then(() => {
+        console.log('[Service Worker] All caches cleared');
+        event.ports[0]?.postMessage({ success: true });
       })
     );
   }

@@ -27,11 +27,16 @@ import {
   Menu,
   X,
   Bell,
+  Mail,
+  TestTube,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import logoUrl from '@assets/New logo-15_1762774603259.png';
+import { useQuery } from '@tanstack/react-query';
+import { calculateProfileCompletion } from '@/lib/profileUtils';
+import { Progress } from '@/components/ui/progress';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -53,6 +58,7 @@ const SCHOOL_NAV_ITEMS: NavItem[] = [
   { label: 'My Jobs', icon: Briefcase, href: '/school/dashboard', roles: ['school'] },
   { label: 'Applications', icon: FileText, href: '/school/dashboard#applications', roles: ['school'] },
   { label: 'Messages', icon: MessageCircle, href: '/messages', roles: ['school', 'teacher'] },
+  { label: 'Email Templates', icon: Mail, href: '/email-templates', roles: ['school'] },
 ];
 
 const TEACHER_NAV_ITEMS: NavItem[] = [
@@ -61,6 +67,7 @@ const TEACHER_NAV_ITEMS: NavItem[] = [
   { label: 'My Applications', icon: FileText, href: '/teacher/dashboard#applications', roles: ['teacher'] },
   { label: 'Saved Jobs', icon: Bookmark, href: '/teacher/dashboard#favorites', roles: ['teacher'] },
   { label: 'Messages', icon: MessageCircle, href: '/messages', roles: ['school', 'teacher'] },
+  { label: 'Profile', icon: User, href: '/profile', roles: ['teacher'] },
 ];
 
 export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarProps) {
@@ -96,11 +103,23 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
 
     // Subscribe to real-time updates
     const channel = supabase
-      .channel('notifications')
+      .channel(`sidebar-notifications-${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
+          schema: 'public',
+          table: 'in_app_notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchUnreadCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
           schema: 'public',
           table: 'in_app_notifications',
           filter: `user_id=eq.${user.id}`,
@@ -115,6 +134,25 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
+
+  // Teacher profile completion (for sidebar indicator)
+  const { data: teacherProfile } = useQuery({
+    queryKey: ['sidebar-teacher-profile', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id && role === 'teacher',
+  });
+
+  const completionPercentage =
+    role === 'teacher' && teacherProfile ? calculateProfileCompletion(teacherProfile) : 0;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -250,7 +288,19 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
                     active && 'bg-primary/10 text-primary font-medium',
                     'hover:bg-primary/5 transition-colors'
                   )}
-                  onClick={() => {
+                  onClick={(e) => {
+                    // Handle hash routes with smooth scroll
+                    if (item.href.includes('#')) {
+                      const [path, hash] = item.href.split('#');
+                      // Navigate to path first, then scroll to hash
+                      setTimeout(() => {
+                        const element = document.getElementById(hash);
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 100);
+                    }
+                    
                     if (isMobile && onClose) {
                       onClose();
                     }
@@ -269,6 +319,21 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
           })}
         </nav>
 
+        {/* Profile completion indicator for teachers */}
+        {role === 'teacher' && teacherProfile && (
+          <div className="px-4 py-3 border-t border-border">
+            <Link href="/profile">
+              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent cursor-pointer">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Profile Completion</p>
+                  <Progress value={completionPercentage} className="h-2 mt-1" />
+                </div>
+                <span className="text-sm font-bold">{completionPercentage}%</span>
+              </div>
+            </Link>
+          </div>
+        )}
+
         {/* Bottom Section */}
         <div className="p-4 border-t border-border space-y-1">
           <Link href="/settings">
@@ -285,6 +350,23 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
               <span>Settings</span>
             </Button>
           </Link>
+          {/* Email Testing Dashboard - Show in development or for testing */}
+          {import.meta.env.DEV && (
+            <Link href="/test-email">
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 h-11 hover:bg-primary/5"
+                onClick={() => {
+                  if (isMobile && onClose) {
+                    onClose();
+                  }
+                }}
+              >
+                <TestTube className="h-5 w-5" />
+                <span>Test Emails</span>
+              </Button>
+            </Link>
+          )}
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 h-11 hover:bg-destructive/10 hover:text-destructive"

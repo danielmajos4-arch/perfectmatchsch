@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
@@ -9,9 +9,10 @@ import { TeacherProfileStep } from '@/components/onboarding/TeacherProfileStep';
 import { ArchetypeQuiz } from '@/components/onboarding/ArchetypeQuiz';
 import { ArchetypeResults } from '@/components/onboarding/ArchetypeResults';
 import { supabase } from '@/lib/supabaseClient';
-import { QuizWithOptions, UserArchetype, InsertTeacher } from '@shared/schema';
+import { QuizWithOptions, UserArchetype, InsertTeacher, Teacher } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
 import logoUrl from '@assets/New logo-15_1762774603259.png';
+import { getMissingFields, isProfileComplete, TeacherProfile as CompletionProfile } from '@/lib/profileUtils';
 
 type OnboardingStep = 'profile' | 'quiz' | 'results';
 
@@ -24,13 +25,99 @@ const ARCHETYPE_MAPPING: Record<string, string> = {
   leader: "The Leader"
 };
 
+interface ProfileFormData {
+  full_name: string;
+  phone: string;
+  location: string;
+  bio: string;
+  years_experience: string;
+  subjects: string[];
+  grade_levels: string[];
+  teaching_philosophy: string;
+  certifications?: string[];
+}
+
+const normalizeYearsExperience = (value?: string | null) => {
+  if (!value) return null;
+  const numeric = Number(value.replace(/[^0-9]/g, ''));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+};
+
 export default function TeacherOnboarding() {
   const { user } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('profile');
-  const [profileData, setProfileData] = useState<any>(null);
+  const [profileData, setProfileData] = useState<ProfileFormData | null>(null);
   const [archetypeData, setArchetypeData] = useState<UserArchetype | null>(null);
   const [error, setError] = useState('');
+  const profileInitializedRef = useRef(false);
+
+  const { data: teacherProfile, isLoading: teacherProfileLoading } = useQuery<Teacher | null>({
+    queryKey: ['teacher-onboarding-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as Teacher | null;
+    },
+    enabled: !!user?.id,
+  });
+
+  const isTeacher = user?.user_metadata?.role === 'teacher';
+  const shouldEnforceGuard = isTeacher && !teacherProfile?.profile_complete;
+
+  useEffect(() => {
+    if (!profileInitializedRef.current && teacherProfile) {
+      setProfileData({
+        full_name: teacherProfile.full_name || user?.user_metadata?.full_name || '',
+        phone: teacherProfile.phone || '',
+        location: teacherProfile.location || '',
+        bio: teacherProfile.bio || '',
+        years_experience: teacherProfile.years_experience || '',
+        subjects: teacherProfile.subjects || [],
+        grade_levels: teacherProfile.grade_levels || [],
+        teaching_philosophy: teacherProfile.teaching_philosophy || '',
+        certifications: teacherProfile.certifications || [],
+      });
+      profileInitializedRef.current = true;
+    }
+  }, [teacherProfile, user]);
+
+  useEffect(() => {
+    if (teacherProfile?.profile_complete && currentStep !== 'results' && location !== '/teacher/dashboard') {
+      setLocation('/teacher/dashboard');
+    }
+  }, [teacherProfile?.profile_complete, currentStep, setLocation, location]);
+
+  useEffect(() => {
+    if (!shouldEnforceGuard) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = 'Your profile is incomplete. Are you sure you want to leave?';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [shouldEnforceGuard]);
+
+  useEffect(() => {
+    if (!shouldEnforceGuard) return;
+
+    const enforceOnboarding = (event: PopStateEvent) => {
+      event.preventDefault();
+      setLocation('/onboarding/teacher');
+    };
+
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', enforceOnboarding);
+    return () => window.removeEventListener('popstate', enforceOnboarding);
+  }, [shouldEnforceGuard, setLocation]);
 
   const { data: quizData, isLoading: loadingQuiz, error: quizError } = useQuery<QuizWithOptions[]>({
     queryKey: ['quiz-questions'],
@@ -192,6 +279,48 @@ export default function TeacherOnboarding() {
     },
   });
 
+  const getCompletionPayload = useCallback(
+    (overrides: Partial<CompletionProfile> = {}) => {
+      if (!user) return null;
+      const source = profileData || teacherProfile;
+      if (!source) return null;
+
+      const certifications = source.certifications ?? teacherProfile?.certifications ?? [];
+      const archetypeValue =
+        overrides.archetype ??
+        archetypeData?.archetype_name ??
+        teacherProfile?.archetype ??
+        null;
+
+      return {
+        full_name: (source.full_name || user.user_metadata?.full_name || '').trim(),
+        email: user.email || null,
+        phone: source.phone || null,
+        location: source.location || null,
+        bio: source.bio || null,
+        years_experience: normalizeYearsExperience(source.years_experience),
+        subjects: source.subjects || [],
+        grade_levels: source.grade_levels || [],
+        archetype: archetypeValue,
+        teaching_philosophy: source.teaching_philosophy || null,
+        certifications,
+        ...overrides,
+      } as CompletionProfile;
+    },
+    [user, profileData, teacherProfile, archetypeData]
+  );
+
+  const onboardingComplete = useMemo(() => {
+    const payload = getCompletionPayload();
+    return payload ? isProfileComplete(payload) : false;
+  }, [getCompletionPayload]);
+
+  const incompleteFields = useMemo(() => {
+    if (onboardingComplete) return [];
+    const payload = getCompletionPayload();
+    return payload ? getMissingFields(payload) : [];
+  }, [onboardingComplete, getCompletionPayload]);
+
   const saveProfileMutation = useMutation({
     mutationFn: async (data: any) => {
       console.log('=== PROFILE SAVE DEBUG START ===');
@@ -294,6 +423,7 @@ export default function TeacherOnboarding() {
         subjects: data.subjects,
         grade_levels: data.grade_levels,
         teaching_philosophy: data.teaching_philosophy || null,
+        certifications: data.certifications || teacherProfile?.certifications || [],
         profile_complete: false,
       };
 
@@ -432,19 +562,29 @@ export default function TeacherOnboarding() {
 
         if (verification.success) {
           console.log('✅ Profile verified and saved successfully!');
-          setProfileData(data);
+          setProfileData({
+            ...data,
+            certifications: data.certifications || teacherProfile?.certifications || [],
+          });
           setCurrentStep('quiz');
           setError('');
         } else {
           console.error('❌ Profile save verification failed:', verification.errors);
           setError(`Profile saved but verification failed: ${verification.errors.join(', ')}`);
           // Still proceed to quiz, but log the issue
-          setProfileData(data);
+          setProfileData({
+            ...data,
+            certifications: data.certifications || teacherProfile?.certifications || [],
+          });
           setCurrentStep('quiz');
         }
+        queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
       } else {
         // Fallback if no user
-      setProfileData(data);
+      setProfileData({
+        ...data,
+        certifications: data.certifications || teacherProfile?.certifications || [],
+      });
       setCurrentStep('quiz');
       setError('');
       }
@@ -510,6 +650,8 @@ export default function TeacherOnboarding() {
       console.log('3b. Sorted archetypes (with tiebreaker):', sortedArchetypes);
 
       const finalArchetypeName = ARCHETYPE_MAPPING[topArchetype] || topArchetype;
+      const completionPayload = getCompletionPayload({ archetype: finalArchetypeName });
+      const profileIsComplete = completionPayload ? isProfileComplete(completionPayload) : false;
 
       console.log('4. Top archetype:', topArchetype, '→ Mapped to:', finalArchetypeName);
 
@@ -520,7 +662,7 @@ export default function TeacherOnboarding() {
         .update({
           quiz_result: answers,
           archetype: finalArchetypeName,
-          profile_complete: true
+          profile_complete: profileIsComplete
         })
         .eq('user_id', user.id)
         .select();
@@ -598,6 +740,9 @@ export default function TeacherOnboarding() {
       setCurrentStep('results');
       setError('');
       queryClient.invalidateQueries({ queryKey: ['teacher-profile'] });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
+      }
     },
     onError: (error: any) => {
       console.error('Error submitting quiz:', error);
@@ -605,9 +750,12 @@ export default function TeacherOnboarding() {
     },
   });
 
-  const handleProfileSubmit = (data: any) => {
-    saveProfileMutation.mutate(data);
-  };
+  const handleProfileSubmit = useCallback((data: ProfileFormData) => {
+    saveProfileMutation.mutate({
+      ...data,
+      certifications: data.certifications || teacherProfile?.certifications || [],
+    });
+  }, [saveProfileMutation, teacherProfile?.certifications]);
 
   const handleQuizComplete = (answers: Record<string, string>) => {
     submitQuizMutation.mutate(answers);
@@ -617,9 +765,63 @@ export default function TeacherOnboarding() {
     setCurrentStep('profile');
   };
 
+  const completeOnboardingMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('User not found');
+      const payload = getCompletionPayload();
+      if (!payload) throw new Error('Incomplete profile data');
+
+      const { error } = await supabase
+        .from('teachers')
+        .update({
+          full_name: payload.full_name,
+          email: payload.email,
+          phone: payload.phone,
+          location: payload.location,
+          bio: payload.bio,
+          years_experience: payload.years_experience,
+          subjects: payload.subjects,
+          grade_levels: payload.grade_levels,
+          archetype: payload.archetype,
+          teaching_philosophy: payload.teaching_philosophy,
+          certifications: payload.certifications || [],
+          profile_complete: true,
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
+        queryClient.invalidateQueries({ queryKey: ['/api/teacher-profile', user.id] });
+      }
+      setLocation('/teacher/dashboard');
+    },
+    onError: () => {
+      setError('Failed to complete onboarding. Please try again.');
+    },
+  });
+
+  const handleContinueToDashboard = () => {
+    if (!onboardingComplete || completeOnboardingMutation.isPending) return;
+    completeOnboardingMutation.mutate();
+  };
+
   if (!user) {
     setLocation('/login');
     return null;
+  }
+
+  if (teacherProfileLoading && !teacherProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <div className="h-12 w-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-muted-foreground">Loading your onboarding data...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -671,7 +873,7 @@ export default function TeacherOnboarding() {
             {currentStep === 'profile' && (
               <TeacherProfileStep
                 onNext={handleProfileSubmit}
-                initialData={profileData}
+                initialData={profileData || undefined}
               />
             )}
 
@@ -707,7 +909,33 @@ export default function TeacherOnboarding() {
             )}
 
             {currentStep === 'results' && archetypeData && (
-              <ArchetypeResults archetype={archetypeData} />
+              <>
+                {!onboardingComplete && (
+                  <Alert variant="destructive" className="mb-6">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Complete all required profile fields before accessing the dashboard.
+                      {incompleteFields.length > 0 && (
+                        <ul className="mt-2 list-disc list-inside space-y-1 text-sm">
+                          {incompleteFields.map((field) => (
+                            <li key={field}>{field}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                <ArchetypeResults
+                  archetype={archetypeData}
+                  onContinue={handleContinueToDashboard}
+                  continueDisabled={!onboardingComplete || completeOnboardingMutation.isPending}
+                  continueDisabledMessage={
+                    onboardingComplete
+                      ? 'Saving your profile...'
+                      : 'Finish completing your profile before continuing.'
+                  }
+                />
+              </>
             )}
           </CardContent>
         </Card>

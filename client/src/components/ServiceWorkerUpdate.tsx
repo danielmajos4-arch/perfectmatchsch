@@ -12,21 +12,35 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { X, RefreshCw, WifiOff } from 'lucide-react';
 
 export function ServiceWorkerUpdate() {
-  const { isUpdateAvailable, isOffline, installUpdate } = useServiceWorker();
+  const { updateAvailable, updateServiceWorker } = useServiceWorker();
   const [isVisible, setIsVisible] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (isUpdateAvailable) {
+    if (updateAvailable && !dismissed) {
       setIsVisible(true);
+      
+      // Auto-dismiss after 30 seconds if user doesn't interact
+      const autoDismissTimer = setTimeout(() => {
+        if (isVisible) {
+          handleDismiss();
+        }
+      }, 30000);
+      
+      return () => clearTimeout(autoDismissTimer);
     }
-  }, [isUpdateAvailable]);
+  }, [updateAvailable, dismissed, isVisible]);
 
   const handleUpdate = async () => {
     setIsInstalling(true);
     try {
-      await installUpdate();
+      await updateServiceWorker();
       // The page will reload automatically when the service worker activates
+      // Wait a moment for the service worker to activate
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Error installing update:', error);
       setIsInstalling(false);
@@ -35,7 +49,8 @@ export function ServiceWorkerUpdate() {
 
   const handleDismiss = () => {
     setIsVisible(false);
-    // Hide for this session, but will show again on next page load if update still available
+    setDismissed(true);
+    // Will show again on next page load if update still available
   };
 
   if (!isVisible) {
@@ -68,7 +83,7 @@ export function ServiceWorkerUpdate() {
         <CardFooter className="flex gap-2 pt-0">
           <Button
             onClick={handleUpdate}
-            disabled={isInstalling || isOffline}
+            disabled={isInstalling}
             className="flex-1"
             size="sm"
           >
@@ -93,14 +108,6 @@ export function ServiceWorkerUpdate() {
             Later
           </Button>
         </CardFooter>
-        {isOffline && (
-          <div className="px-6 pb-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <WifiOff className="h-3 w-3" />
-              <span>Update requires internet connection</span>
-            </div>
-          </div>
-        )}
       </Card>
     </div>
   );

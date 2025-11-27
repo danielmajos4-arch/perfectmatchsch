@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
-import { MapPin, Clock, DollarSign, Briefcase, Zap } from 'lucide-react';
+import { MapPin, Clock, DollarSign, Briefcase, Zap, Bookmark, BookmarkCheck } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ApplicationModal } from '@/components/ApplicationModal';
 import { MatchScoreIndicator, MatchScoreBadge } from '@/components/MatchScoreIndicator';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/hooks/use-toast';
+import { updateTeacherJobMatch } from '@/lib/matchingService';
 import type { Job } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -19,6 +21,8 @@ interface JobCardProps {
 
 export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProps) {
   const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   const { data: user } = useQuery({
     queryKey: ['/api/auth/user'],
@@ -34,14 +38,64 @@ export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProp
       if (!user?.id) return false;
       const { data, error } = await supabase
         .from('applications')
-        .select('id')
+        .select('id, status')
         .eq('teacher_id', user.id)
         .eq('job_id', job.id)
         .maybeSingle();
       
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking application status:', error);
+      }
       return !!data;
     },
-    enabled: !!user?.id && showQuickApply,
+    enabled: !!user?.id && user?.user_metadata?.role === 'teacher',
+  });
+
+  // Check if job is favorited
+  const { data: matchData } = useQuery({
+    queryKey: ['/api/job-match', user?.id, job.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('teacher_job_matches')
+        .select('id, is_favorited')
+        .eq('teacher_id', user.id)
+        .eq('job_id', job.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user?.id && user?.user_metadata?.role === 'teacher',
+  });
+
+  const isFavorited = matchData?.is_favorited || false;
+
+  // Favorite/unfavorite mutation
+  const favoriteMutation = useMutation({
+    mutationFn: async (isFavorited: boolean) => {
+      if (!user?.id || !matchData?.id) {
+        // Create match record if it doesn't exist
+        const { data: newMatch } = await supabase
+          .from('teacher_job_matches')
+          .insert({
+            teacher_id: user.id,
+            job_id: job.id,
+            is_favorited: isFavorited,
+            match_score: matchScore || 0,
+          })
+          .select()
+          .single();
+        return newMatch;
+      }
+      return await updateTeacherJobMatch(matchData.id, { is_favorited: isFavorited });
+    },
+    onSuccess: (_, isFavorited) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/job-match', user?.id, job.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/job-matches', user?.id] });
+      toast({
+        title: isFavorited ? 'Saved job' : 'Removed from saved',
+        description: isFavorited ? 'Job saved! View it in your dashboard.' : 'Job removed from your saved jobs.',
+      });
+    },
   });
 
   const isTeacher = user?.user_metadata?.role === 'teacher';
@@ -70,16 +124,38 @@ export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProp
 
           {/* Job Details */}
           <div className="flex-1 min-w-0">
-            {/* Title and Match Score - Stack on mobile */}
+            {/* Title, Match Score, and Save Button - Stack on mobile */}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-2">
               <Link href={`/jobs/${job.id}`} className="flex-1 min-w-0">
                 <h3 className="text-lg sm:text-xl font-semibold text-foreground hover:text-primary transition-colors break-words cursor-pointer">
                   {job.title}
                 </h3>
               </Link>
-              {matchScore !== undefined && (
-                <MatchScoreBadge score={matchScore} />
-              )}
+              <div className="flex items-center gap-2">
+                {matchScore !== undefined && (
+                  <MatchScoreBadge score={matchScore} />
+                )}
+                {isTeacher && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      favoriteMutation.mutate(!isFavorited);
+                    }}
+                    disabled={favoriteMutation.isPending}
+                    aria-label={isFavorited ? 'Remove from saved' : 'Save job'}
+                  >
+                    {isFavorited ? (
+                      <BookmarkCheck className="h-5 w-5 text-primary" />
+                    ) : (
+                      <Bookmark className="h-5 w-5" />
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="text-sm text-muted-foreground mb-3 break-words">
               {job.school_name}

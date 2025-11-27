@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,8 @@ import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
 import { queryClient } from '@/lib/queryClient';
+import { getOrCreateConversation } from '@/lib/conversationService';
+import { notifyNewApplication } from '@/lib/notificationService';
 import { MatchScoreIndicator } from '@/components/MatchScoreIndicator';
 import { 
   ChevronLeft, 
@@ -52,6 +54,35 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
   const [coverLetter, setCoverLetter] = useState('');
   const [draftSaved, setDraftSaved] = useState(false);
 
+  // Get current user
+  const { data: user } = useQuery({
+    queryKey: ['/api/auth/user'],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user;
+    },
+  });
+
+  // Check if already applied
+  const { data: existingApplication } = useQuery({
+    queryKey: ['application-status', job.id, user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('applications')
+        .select('id, status')
+        .eq('job_id', job.id)
+        .eq('teacher_id', user.id)
+        .maybeSingle();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking application status:', error);
+      }
+      return data;
+    },
+    enabled: !!user?.id && isOpen,
+  });
+
   // Load draft from localStorage
   useEffect(() => {
     if (isOpen) {
@@ -78,13 +109,85 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
+      // Check if already applied before submission
+      const { data: existing } = await supabase
+        .from('applications')
+        .select('id, status')
+        .eq('job_id', job.id)
+        .eq('teacher_id', userData.user.id)
+        .maybeSingle();
+
+      if (existing) {
+        throw new Error('DUPLICATE_APPLICATION');
+      }
+
       const { error } = await supabase.from('applications').insert({
         job_id: job.id,
         teacher_id: userData.user.id,
         cover_letter: coverLetter,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Handle duplicate key error specifically
+        if (error.code === '23505' || error.message.includes('duplicate key')) {
+          throw new Error('DUPLICATE_APPLICATION');
+        }
+        throw error;
+      }
+
+      // Get application ID for notification
+      let applicationId: string | null = null;
+      const { data: applicationData } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('job_id', job.id)
+        .eq('teacher_id', userData.user.id)
+        .single();
+      
+      applicationId = applicationData?.id || null;
+
+      // Auto-create conversation after successful application
+      try {
+        const { conversation, isNew } = await getOrCreateConversation(
+          userData.user.id, // teacher_id
+          job.school_id,    // school_id
+          job.id           // job_id
+        );
+
+        // Create initial system message if conversation is new
+        if (isNew) {
+          await supabase.from('messages').insert({
+            conversation_id: conversation.id,
+            sender_id: userData.user.id,
+            content: `Application submitted for ${job.title} at ${job.school_name}`,
+          });
+        }
+      } catch (convError) {
+        // Log error but don't fail the application
+        console.error('Error creating conversation:', convError);
+      }
+
+      // Notify school about new application (non-blocking)
+      if (applicationId) {
+        try {
+          // Get teacher name
+          const { data: teacherData } = await supabase
+            .from('teachers')
+            .select('full_name')
+            .eq('user_id', userData.user.id)
+            .maybeSingle();
+          
+          const teacherName = teacherData?.full_name || 'A teacher';
+          await notifyNewApplication(
+            job.school_id,
+            applicationId,
+            teacherName,
+            job.title
+          );
+        } catch (notifError) {
+          console.error('Error sending notification:', notifError);
+        }
+      }
       
       // Clear draft after successful submission
       localStorage.removeItem(`application-draft-${job.id}`);
@@ -96,17 +199,35 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
       });
       queryClient.invalidateQueries({ queryKey: ['/api/applications'] });
       queryClient.invalidateQueries({ queryKey: ['/api/job-matches'] });
+      queryClient.invalidateQueries({ queryKey: ['application-status', job.id, user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/has-applied', user?.id, job.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
       onClose();
       setCoverLetter('');
       setCurrentStep('review');
       setDraftSaved(false);
     },
     onError: (error: any) => {
-      toast({
-        title: 'Application failed',
-        description: error.message || 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      });
+      if (error.message === 'DUPLICATE_APPLICATION' || error.code === '23505' || error.message?.includes('duplicate key')) {
+        toast({
+          title: 'Already applied',
+          description: 'You have already applied to this position. Check "My Applications" to view your application status.',
+          variant: 'destructive',
+          action: {
+            label: 'View Applications',
+            onClick: () => {
+              window.location.href = '/teacher/dashboard#applications';
+            },
+          },
+        });
+      } else {
+        toast({
+          title: 'Application failed',
+          description: error.message || 'Something went wrong. Please try again.',
+          variant: 'destructive',
+        });
+      }
+      console.error('Application error:', error);
     },
   });
 

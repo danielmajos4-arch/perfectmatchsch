@@ -13,6 +13,7 @@ import { AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { InsertSchool } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
+import { createDefaultTemplates } from '@/utils/defaultTemplates';
 import logoUrl from '@assets/New logo-15_1762774603259.png';
 
 const SCHOOL_TYPES = [
@@ -70,6 +71,14 @@ export default function SchoolOnboarding() {
           .insert([schoolData]);
 
         if (error) throw error;
+
+        // Create default email templates for new schools
+        try {
+          await createDefaultTemplates(user.id);
+        } catch (error) {
+          console.error('Error creating default templates:', error);
+          // Don't fail the onboarding if templates fail to create
+        }
       }
 
       return schoolData;

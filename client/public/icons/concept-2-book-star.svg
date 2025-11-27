@@ -1,0 +1,54 @@
+<!-- Concept 2: Open Book with Perfect Match Star -->
+<!-- Design: Stylized open book with a star/checkmark representing perfect match -->
+<!-- Colors: Primary Teal (#14B8A6) and Accent Purple (#8B5CF6) -->
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#14B8A6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0D9488;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FCD34D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F59E0B;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background Circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bgGrad2)"/>
+  
+  <!-- Open Book -->
+  <g transform="translate(256, 256)">
+    <!-- Left Page -->
+    <path d="M -120 -80 L -120 80 L 0 100 L 0 -60 Z" fill="#FFFFFF" opacity="0.95"/>
+    <!-- Right Page -->
+    <path d="M 0 -60 L 0 100 L 120 80 L 120 -80 Z" fill="#FFFFFF" opacity="0.95"/>
+    <!-- Book Spine -->
+    <rect x="-8" y="-100" width="16" height="200" fill="#8B5CF6" rx="2"/>
+    <!-- Book Binding -->
+    <ellipse cx="0" cy="0" rx="8" ry="100" fill="#6D28D9"/>
+    
+    <!-- Text Lines on Pages (subtle) -->
+    <line x1="-100" y1="-40" x2="-20" y2="-40" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+    <line x1="-100" y1="-10" x2="-20" y2="-10" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+    <line x1="-100" y1="20" x2="-20" y2="20" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+    <line x1="-100" y1="50" x2="-20" y2="50" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+    
+    <line x1="20" y1="-40" x2="100" y2="-40" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+    <line x1="20" y1="-10" x2="100" y2="-10" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+    <line x1="20" y1="20" x2="100" y2="20" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+    <line x1="20" y1="50" x2="100" y2="50" stroke="#E5E7EB" stroke-width="2" opacity="0.5"/>
+  </g>
+  
+  <!-- Perfect Match Star (Top Right) -->
+  <g transform="translate(380, 120)">
+    <!-- Star Shape -->
+    <path d="M 0 -40 L 12 -12 L 40 -12 L 20 8 L 32 36 L 0 20 L -32 36 L -20 8 L -40 -12 L -12 -12 Z" 
+          fill="url(#starGrad)" opacity="0.95"/>
+    <!-- Checkmark inside star -->
+    <path d="M -15 0 L -5 10 L 15 -10" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+  
+  <!-- Subtle "PM" Monogram (Bottom) -->
+  <text x="256" y="420" font-family="Arial, sans-serif" font-size="36" font-weight="bold" fill="#FFFFFF" text-anchor="middle" opacity="0.7">PM</text>
+</svg>
+

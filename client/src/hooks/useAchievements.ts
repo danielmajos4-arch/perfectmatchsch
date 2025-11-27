@@ -15,9 +15,12 @@ import {
 } from '@/lib/achievementService';
 
 export function useAchievements() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
   const [lastCheckedCount, setLastCheckedCount] = useState(0);
+
+  // Only enable achievements for teachers (schools don't have achievements)
+  const isTeacher = role === 'teacher';
 
   // Fetch user achievements
   const {
@@ -27,29 +30,34 @@ export function useAchievements() {
   } = useQuery<Achievement[]>({
     queryKey: ['achievements', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id || !isTeacher) return [];
       return await getUserAchievements(user.id);
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && isTeacher,
   });
 
   // Fetch achievement stats
   const { data: stats } = useQuery({
     queryKey: ['achievement-stats', user?.id],
     queryFn: async () => {
-      if (!user?.id) return null;
+      if (!user?.id || !isTeacher) return null;
       return await getUserAchievementStats(user.id);
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && isTeacher,
   });
 
   // Check for new achievements
   const checkAchievements = useCallback(async () => {
-    if (!user?.id) return;
+    if (!user?.id || !isTeacher) return; // Skip for school users
     
     // Silently handle errors - achievements are non-critical
     try {
       const newAchievements = await checkAllAchievements(user.id);
+      
+      // If achievement system is disabled, don't try again
+      if (!newAchievements || newAchievements.length === 0) {
+        return;
+      }
       
       // If we have new achievements, show notification for the first one
       if (newAchievements.length > 0 && achievements.length > lastCheckedCount) {
@@ -58,26 +66,31 @@ export function useAchievements() {
         setLastCheckedCount(achievements.length);
       }
 
-      // Refetch to update the list
-      await refetch();
+      // Refetch to update the list (only if we got achievements)
+      if (newAchievements.length > 0) {
+        await refetch();
+      }
     } catch {
       // Silently handle errors - achievements are non-critical
       // Don't spam console with achievement errors
     }
-  }, [user?.id, achievements.length, lastCheckedCount, refetch]);
+  }, [user?.id, isTeacher, achievements.length, lastCheckedCount, refetch]);
 
-  // Check achievements on mount and periodically
+  // Check achievements on mount and periodically (with longer interval to reduce spam)
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !isTeacher) return; // Skip for school users
 
-    // Initial check
-    checkAchievements();
+    // Initial check after a short delay
+    const initialTimeout = setTimeout(checkAchievements, 2000);
 
-    // Check every 30 seconds
-    const interval = setInterval(checkAchievements, 30000);
+    // Check every 60 seconds (reduced from 30 to minimize spam)
+    const interval = setInterval(checkAchievements, 60000);
 
-    return () => clearInterval(interval);
-  }, [user?.id, checkAchievements]);
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [user?.id, isTeacher, checkAchievements]);
 
   // Update last checked count when achievements change
   useEffect(() => {

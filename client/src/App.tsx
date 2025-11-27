@@ -20,10 +20,16 @@ import JobDetail from "@/pages/JobDetail";
 import Messages from "@/pages/Messages";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
+import Notifications from "@/pages/Notifications";
+import EmailTemplates from "@/pages/EmailTemplates";
+import EmailTestingDashboard from "@/pages/EmailTestingDashboard";
 import NotFound from "@/pages/not-found";
 import { ServiceWorkerUpdate, OfflineIndicator } from "@/components/ServiceWorkerUpdate";
 import { PWATestPanel } from "@/components/PWATestPanel";
 import { EmailTestPanel } from "@/components/EmailTestPanel";
+import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
+import { OnboardingRequired } from "@/components/OnboardingRequired";
+import { OnboardingWatcher } from "@/components/OnboardingWatcher";
 // Import debug utilities to make them available globally
 import "@/utils/debugDatabase";
 import "@/utils/verifyProfileSave";
@@ -43,7 +49,9 @@ function Router() {
       {/* Role-specific dashboard routes */}
       <Route path="/teacher/dashboard">
         <RoleProtectedRoute allowedRole="teacher">
-          <TeacherDashboard />
+          <OnboardingRequired>
+            <TeacherDashboard />
+          </OnboardingRequired>
         </RoleProtectedRoute>
       </Route>
       <Route path="/school/dashboard">
@@ -56,8 +64,16 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       
       {/* Other protected routes */}
-      <Route path="/jobs" component={Jobs} />
-      <Route path="/jobs/:id" component={JobDetail} />
+      <Route path="/jobs">
+        <OnboardingRequired>
+          <Jobs />
+        </OnboardingRequired>
+      </Route>
+      <Route path="/jobs/:id">
+        <OnboardingRequired>
+          <JobDetail />
+        </OnboardingRequired>
+      </Route>
       <Route path="/messages">
         <ProtectedRoute>
           <Messages />
@@ -73,6 +89,26 @@ function Router() {
                 <Settings />
               </ProtectedRoute>
             </Route>
+            <Route path="/notifications">
+              <ProtectedRoute>
+                <Notifications />
+              </ProtectedRoute>
+            </Route>
+            <Route path="/email-templates">
+              <RoleProtectedRoute allowedRole="school">
+                <EmailTemplates />
+              </RoleProtectedRoute>
+            </Route>
+            <Route path="/admin/email-testing">
+              <ProtectedRoute>
+                <EmailTestingDashboard />
+              </ProtectedRoute>
+            </Route>
+            <Route path="/test-email">
+              <ProtectedRoute>
+                <EmailTestingDashboard />
+              </ProtectedRoute>
+            </Route>
             
             <Route component={NotFound} />
     </Switch>
@@ -84,6 +120,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
+          <OnboardingWatcher />
+          <ProfileCompletionBanner />
           <Toaster />
           <Router />
           {/* Service Worker Update Prompt */}

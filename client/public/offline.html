@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#00BCD4">
+  <meta name="theme-color" content="#6366F1">
   <title>Offline - PerfectMatchSchools</title>
   <style>
     * {
@@ -20,7 +20,7 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: linear-gradient(135deg, #00BCD4 0%, #E91E8C 50%, #FF6B35 100%);
+      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #06B6D4 100%);
       color: white;
       text-align: center;
       padding: 20px;
@@ -65,7 +65,7 @@
       display: inline-block;
       padding: 12px 32px;
       background: white;
-      color: #00BCD4;
+      color: #6366F1;
       text-decoration: none;
       border-radius: 8px;
       font-weight: 600;
@@ -94,7 +94,18 @@
 </head>
 <body>
   <div class="container">
-    <div class="icon">📡</div>
+    <div class="icon">
+      <svg width="64" height="64" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="56" y="56" width="400" height="400" rx="80" fill="white" opacity="0.2"/>
+        <g transform="translate(256, 256)">
+          <rect x="-30" y="-40" width="60" height="80" rx="8" fill="white" opacity="0.95"/>
+          <polygon points="0,-55 -30,-35 30,-35" fill="white" opacity="0.9"/>
+          <rect x="-10" y="0" width="20" height="40" rx="4" fill="white" opacity="0.7"/>
+          <circle cx="30" cy="-25" r="18" fill="white" opacity="0.95"/>
+          <rect x="15" y="-7" width="30" height="50" rx="15" fill="white" opacity="0.95"/>
+        </g>
+      </svg>
+    </div>
     <h1>You're Offline</h1>
     <p>
       It looks like you've lost your internet connection. 

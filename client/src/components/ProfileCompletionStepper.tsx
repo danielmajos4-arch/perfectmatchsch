@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Circle, ArrowRight, User, FileText, BookOpen, Upload, Award } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRight, User, FileText, BookOpen, Upload, Award, Trophy, TrendingUp } from 'lucide-react';
 import type { Teacher } from '@shared/schema';
+import { useAchievements } from '@/hooks/useAchievements';
 
 interface ProfileCompletionStepperProps {
   teacher: Teacher;
@@ -21,6 +22,8 @@ interface Step {
 }
 
 export function ProfileCompletionStepper({ teacher, completionPercentage }: ProfileCompletionStepperProps) {
+  const { achievements } = useAchievements();
+  
   const steps: Step[] = [
     {
       id: 'profile',
@@ -66,6 +69,24 @@ export function ProfileCompletionStepper({ teacher, completionPercentage }: Prof
 
   const completedSteps = steps.filter(s => s.isComplete).length;
   const totalSteps = steps.length;
+  const incompleteSteps = steps.filter(s => !s.isComplete);
+  const nextStep = incompleteSteps[0];
+  
+  // Get impact message based on completion
+  const getImpactMessage = () => {
+    if (completionPercentage >= 100) {
+      return "Your profile is complete! You're seeing maximum matches.";
+    } else if (completionPercentage >= 75) {
+      return "Almost there! Complete your profile to see 2x more matches.";
+    } else if (completionPercentage >= 50) {
+      return "Complete your profile to see 3x more matches and unlock achievements.";
+    } else {
+      return "Complete your profile to unlock more job matches and achievements.";
+    }
+  };
+
+  // Check if profile complete achievement is unlocked
+  const hasProfileCompleteAchievement = achievements.some(a => a.code === 'profile_complete');
 
   return (
     <Card className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
@@ -141,14 +162,70 @@ export function ProfileCompletionStepper({ teacher, completionPercentage }: Prof
             );
           })}
         </div>
+        {/* Impact Message */}
+        {completionPercentage < 100 && (
+          <div className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+            <div className="flex items-start gap-3">
+              <TrendingUp className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground mb-1">Boost Your Matches</p>
+                <p className="text-xs text-muted-foreground">{getImpactMessage()}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Achievement Reward Message */}
+        {!hasProfileCompleteAchievement && completionPercentage < 100 && (
+          <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Trophy className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
+                  Unlock Achievement
+                </p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                  Complete your profile to 100% to unlock the "Profile Complete" achievement badge!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Completion Celebration */}
+        {completionPercentage === 100 && (
+          <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Trophy className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div>
+                <p className="text-sm font-semibold text-green-900 dark:text-green-100">
+                  Profile Complete! 🎉
+                </p>
+                <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                  Your profile is fully optimized for maximum job matches.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {completionPercentage < 100 && (
           <div className="mt-6 pt-4 border-t border-border">
-            <Link href="/profile">
-              <Button variant="outline" className="w-full gap-2">
-                <User className="h-4 w-4" />
-                Complete All Steps
-              </Button>
-            </Link>
+            {nextStep && nextStep.link ? (
+              <Link href={nextStep.link}>
+                <Button className="w-full gap-2">
+                  <ArrowRight className="h-4 w-4" />
+                  Complete Next Step: {nextStep.label}
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/profile">
+                <Button variant="outline" className="w-full gap-2">
+                  <User className="h-4 w-4" />
+                  Complete All Steps
+                </Button>
+              </Link>
+            )}
           </div>
         )}
       </CardContent>

@@ -13,6 +13,7 @@ import { uploadProfileImage, uploadDocument } from '@/lib/storageService';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { Teacher, InsertTeacher } from '@shared/schema';
+import { isProfileComplete, TeacherProfile as CompletionProfile } from '@/lib/profileUtils';
 
 interface TeacherProfileEditorProps {
   teacher: Teacher;
@@ -147,7 +148,29 @@ export function TeacherProfileEditor({ teacher, userId, onSave }: TeacherProfile
     });
   };
 
+  const normalizeYearsExperience = (value: string) => {
+    if (!value) return null;
+    const numeric = Number(value.replace(/[^0-9]/g, ''));
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+  };
+
   const handleSave = () => {
+    const completionPayload: CompletionProfile = {
+      full_name: formData.full_name?.trim() || null,
+      email: teacher.email || null,
+      phone: formData.phone?.trim() || null,
+      location: formData.location?.trim() || null,
+      bio: formData.bio?.trim() || null,
+      years_experience: normalizeYearsExperience(formData.years_experience),
+      subjects: formData.subjects,
+      grade_levels: formData.grade_levels,
+      archetype: teacher.archetype || null,
+      teaching_philosophy: formData.teaching_philosophy?.trim() || null,
+      certifications: teacher.certifications || [],
+    };
+
+    const profileComplete = isProfileComplete(completionPayload);
+
     updateProfileMutation.mutate({
       full_name: formData.full_name,
       phone: formData.phone,
@@ -159,6 +182,7 @@ export function TeacherProfileEditor({ teacher, userId, onSave }: TeacherProfile
       teaching_philosophy: formData.teaching_philosophy || null,
       profile_photo_url: formData.profile_photo_url || null,
       resume_url: formData.resume_url || null,
+      profile_complete: profileComplete,
     });
   };
 

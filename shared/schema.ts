@@ -220,5 +220,27 @@ export interface SearchHistory {
   searched_at: string;
 }
 
+// Email Template interfaces
+export interface EmailTemplate {
+  id: string;
+  school_id: string;
+  name: string;
+  subject: string;
+  body: string;
+  category: 'rejection' | 'interview' | 'offer' | 'general' | null;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InsertEmailTemplate {
+  school_id: string;
+  name: string;
+  subject: string;
+  body: string;
+  category?: 'rejection' | 'interview' | 'offer' | 'general' | null;
+  is_default?: boolean;
+}
+
 // Export matching types
 export * from './matching';

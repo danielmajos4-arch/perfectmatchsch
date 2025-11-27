@@ -268,3 +268,48 @@ export async function notifyAchievementUnlocked(
   );
 }
 
+export async function notifyNewApplication(
+  schoolUserId: string,
+  applicationId: string,
+  teacherName: string,
+  jobTitle: string
+): Promise<void> {
+  await createNotification(
+    schoolUserId,
+    'new_candidate_match',
+    'New Application Received',
+    `${teacherName} applied for "${jobTitle}"`,
+    {
+      linkUrl: `/school/dashboard#applications`,
+      linkText: 'View Application',
+      icon: '📨',
+      metadata: { application_id: applicationId, job_title: jobTitle },
+    }
+  );
+}
+
+export async function notifyJobPostedToTeachers(
+  teacherUserIds: string[],
+  jobId: string,
+  jobTitle: string,
+  schoolName: string
+): Promise<void> {
+  // Create notifications for all matching teachers
+  const promises = teacherUserIds.map(userId =>
+    createNotification(
+      userId,
+      'new_job_match',
+      'New Job Match!',
+      `${schoolName} posted a job that matches your profile: "${jobTitle}"`,
+      {
+        linkUrl: `/jobs/${jobId}`,
+        linkText: 'View Job',
+        icon: '🎯',
+        metadata: { job_id: jobId, school_name: schoolName },
+      }
+    )
+  );
+
+  await Promise.all(promises);
+}
+

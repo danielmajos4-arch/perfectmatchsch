@@ -5,15 +5,19 @@
  * All templates are mobile-first and use inline styles for email client compatibility
  */
 
-// Brand colors
+// Brand colors - Updated to match modern design
 const BRAND_COLORS = {
-  primary: '#00BCD4',      // Cyan
-  secondary: '#E91E8C',     // Pink
+  primary: '#6366F1',      // Indigo
+  secondary: '#8B5CF6',    // Purple
+  accent: '#06B6D4',       // Cyan
   background: '#f9f9f9',   // Light gray
   text: '#333333',         // Dark gray
   textLight: '#666666',    // Medium gray
   white: '#ffffff',
   border: '#e0e0e0',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
 };
 
 // Base email styles (inline for email client compatibility)
@@ -421,6 +425,136 @@ export function digestEmailTemplate(data: {
 }
 
 /**
+ * Application Submitted Email Template (Teacher → School)
+ */
+export function applicationSubmittedTemplate(data: {
+  schoolName: string;
+  teacherName: string;
+  jobTitle: string;
+  teacherEmail: string;
+  teacherPhone?: string;
+  yearsExperience?: string;
+  subjects?: string[];
+  matchScore?: number;
+  coverLetter?: string;
+  dashboardUrl: string;
+}): string {
+  const subjectsList = data.subjects && data.subjects.length > 0
+    ? `<p style="margin: 5px 0; font-size: 14px; color: ${BRAND_COLORS.textLight};"><strong>Subjects:</strong> ${data.subjects.join(', ')}</p>`
+    : '';
+  
+  const matchScoreBadge = data.matchScore
+    ? `<div style="display: inline-block; padding: 6px 12px; background-color: ${BRAND_COLORS.primary}; color: ${BRAND_COLORS.white}; border-radius: 4px; font-size: 14px; font-weight: 600; margin: 10px 0;">Match Score: ${data.matchScore} pts</div>`
+    : '';
+
+  const content = `
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">Hi ${data.schoolName},</p>
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+      You have received a new application for <strong>${data.jobTitle}</strong>.
+    </p>
+    <div style="margin: 20px 0; padding: 20px; background-color: ${BRAND_COLORS.background}; border-radius: 6px; border-left: 4px solid ${BRAND_COLORS.primary};">
+      <h2 style="margin: 0 0 15px 0; font-size: 20px; color: ${BRAND_COLORS.text}; font-weight: 600;">${data.teacherName}</h2>
+      ${matchScoreBadge}
+      <p style="margin: 10px 0 5px 0; font-size: 14px; color: ${BRAND_COLORS.textLight};"><strong>Email:</strong> ${data.teacherEmail}</p>
+      ${data.teacherPhone ? `<p style="margin: 5px 0; font-size: 14px; color: ${BRAND_COLORS.textLight};"><strong>Phone:</strong> ${data.teacherPhone}</p>` : ''}
+      ${data.yearsExperience ? `<p style="margin: 5px 0; font-size: 14px; color: ${BRAND_COLORS.textLight};"><strong>Experience:</strong> ${data.yearsExperience} years</p>` : ''}
+      ${subjectsList}
+      ${data.coverLetter ? `<div style="margin: 15px 0 0 0; padding: 15px; background-color: ${BRAND_COLORS.white}; border-radius: 4px;"><p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: ${BRAND_COLORS.text};">Cover Letter:</p><p style="margin: 0; font-size: 14px; color: ${BRAND_COLORS.text}; line-height: 1.6; white-space: pre-wrap;">${data.coverLetter}</p></div>` : ''}
+    </div>
+    <p style="margin: 15px 0 0 0; font-size: 16px; line-height: 1.6;">
+      Review this application and other candidates in your dashboard.
+    </p>
+  `;
+
+  return baseEmailTemplate(
+    'New Application Received',
+    content,
+    'View Application',
+    data.dashboardUrl
+  );
+}
+
+/**
+ * New Message Email Template
+ */
+export function newMessageTemplate(data: {
+  recipientName: string;
+  senderName: string;
+  messagePreview: string;
+  conversationUrl: string;
+  jobTitle?: string;
+}): string {
+  const jobContext = data.jobTitle
+    ? `<p style="margin: 0 0 10px 0; font-size: 14px; color: ${BRAND_COLORS.textLight};"><strong>Regarding:</strong> ${data.jobTitle}</p>`
+    : '';
+
+  const content = `
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">Hi ${data.recipientName},</p>
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+      You have received a new message from <strong>${data.senderName}</strong>.
+    </p>
+    <div style="margin: 20px 0; padding: 20px; background-color: ${BRAND_COLORS.background}; border-radius: 6px; border-left: 4px solid ${BRAND_COLORS.primary};">
+      ${jobContext}
+      <p style="margin: 10px 0 5px 0; font-size: 14px; font-weight: 600; color: ${BRAND_COLORS.text};">Message Preview:</p>
+      <p style="margin: 0; font-size: 14px; color: ${BRAND_COLORS.text}; line-height: 1.6; font-style: italic;">"${data.messagePreview}"</p>
+    </div>
+    <p style="margin: 15px 0 0 0; font-size: 16px; line-height: 1.6;">
+      Continue the conversation in your messages.
+    </p>
+  `;
+
+  return baseEmailTemplate(
+    `New Message from ${data.senderName}`,
+    content,
+    'View Message',
+    data.conversationUrl
+  );
+}
+
+/**
+ * Saved Search Alert Email Template
+ */
+export function savedSearchAlertTemplate(data: {
+  teacherName: string;
+  searchName: string;
+  jobs: Array<{
+    title: string;
+    schoolName: string;
+    location: string;
+    jobUrl?: string;
+  }>;
+  dashboardUrl: string;
+}): string {
+  const jobCards = data.jobs.map((job, index) => `
+    <div style="margin: ${index > 0 ? '15px' : '0'} 0 15px 0; padding: 20px; background-color: ${BRAND_COLORS.background}; border-radius: 6px; border-left: 4px solid ${BRAND_COLORS.primary};">
+      <h3 style="margin: 0 0 10px 0; font-size: 18px; color: ${BRAND_COLORS.text}; font-weight: 600;">${job.title}</h3>
+      <p style="margin: 5px 0; font-size: 14px; color: ${BRAND_COLORS.textLight};">
+        <strong>${job.schoolName}</strong> • ${job.location}
+      </p>
+      ${job.jobUrl ? `<a href="${job.jobUrl}" style="display: inline-block; margin-top: 10px; font-size: 14px; color: ${BRAND_COLORS.primary}; text-decoration: underline;">View Job →</a>` : ''}
+    </div>
+  `).join('');
+
+  const content = `
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">Hi ${data.teacherName},</p>
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+      We found <strong style="color: ${BRAND_COLORS.primary};">${data.jobs.length}</strong> new job${data.jobs.length > 1 ? 's' : ''} that match your saved search: <strong>"${data.searchName}"</strong>
+    </p>
+    ${jobCards}
+    <p style="margin: 20px 0 0 0; font-size: 16px; line-height: 1.6;">
+      View all matching jobs and update your saved search preferences in your dashboard.
+    </p>
+  `;
+
+  return baseEmailTemplate(
+    `New Jobs Match Your Search: ${data.searchName}`,
+    content,
+    'View All Matches',
+    data.dashboardUrl
+  );
+}
+
+/**
  * Replace template variables with actual values
  */
 export function replaceTemplateVariables(template: string, variables: Record<string, string>): string {
@@ -430,5 +564,24 @@ export function replaceTemplateVariables(template: string, variables: Record<str
     result = result.replace(regex, value);
   }
   return result;
+}
+
+/**
+ * Generate plain text version from HTML email
+ */
+export function htmlToPlainText(html: string): string {
+  // Simple HTML to plain text conversion
+  return html
+    .replace(/<style[^>]*>.*?<\/style>/gi, '')
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n\s*\n/g, '\n\n')
+    .trim();
 }
 

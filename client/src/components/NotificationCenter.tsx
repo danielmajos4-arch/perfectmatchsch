@@ -60,7 +60,7 @@ export function NotificationCenter() {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel('notifications')
+      .channel(`notifications-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -71,6 +71,20 @@ export function NotificationCenter() {
         },
         () => {
           // Refetch notifications when new one is created
+          queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['notification-count', user.id] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'in_app_notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Refetch when notification is marked as read
           queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
           queryClient.invalidateQueries({ queryKey: ['notification-count', user.id] });
         }
@@ -160,7 +174,7 @@ export function NotificationCenter() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 sm:w-96 p-0" align="end">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 md:w-96 max-w-[calc(100vw-2rem)] sm:max-w-none p-0" align="end" sideOffset={8}>
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold">Notifications</h3>
@@ -183,10 +197,19 @@ export function NotificationCenter() {
           )}
         </div>
 
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[400px] sm:h-[500px]">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-sm text-muted-foreground">Loading...</div>
+            <div className="p-4 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-start gap-3 animate-pulse">
+                  <div className="h-10 w-10 rounded-full bg-muted flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded w-3/4" />
+                    <div className="h-3 bg-muted rounded w-full" />
+                    <div className="h-3 bg-muted rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 px-4">
@@ -237,7 +260,7 @@ export function NotificationCenter() {
               size="sm"
               className="w-full text-xs"
               onClick={() => {
-                setLocation('/settings?tab=notifications');
+                setLocation('/notifications');
                 setIsOpen(false);
               }}
             >

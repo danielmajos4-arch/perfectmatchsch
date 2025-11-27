@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Mail, LogOut, User as UserIcon } from 'lucide-react';
+import { Mail, LogOut, User as UserIcon, ExternalLink, Building2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +15,7 @@ import { PortfolioUpload } from '@/components/PortfolioUpload';
 import { ArchetypeGrowthResources } from '@/components/ArchetypeGrowthResources';
 import { AchievementCollection } from '@/components/achievements';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Teacher } from '@shared/schema';
+import type { Teacher, School } from '@shared/schema';
 
 export default function Profile() {
   const [, setLocation] = useLocation();
@@ -45,6 +45,22 @@ export default function Profile() {
     enabled: !!user?.id && user?.user_metadata?.role === 'teacher',
   });
 
+  const { data: schoolProfile } = useQuery<School>({
+    queryKey: ['/api/school-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as School | null;
+    },
+    enabled: !!user?.id && user?.user_metadata?.role === 'school',
+  });
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast({
@@ -64,6 +80,7 @@ export default function Profile() {
   };
 
   const isTeacher = user?.user_metadata?.role === 'teacher';
+  const isSchool = user?.user_metadata?.role === 'school';
 
   return (
     <AuthenticatedLayout>
@@ -118,16 +135,23 @@ export default function Profile() {
               <div className="flex flex-col items-center text-center space-y-4">
                 <div className="relative">
                   <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-32 md:w-32 border-4 border-primary/30 shadow-xl ring-4 ring-primary/10">
-                    <AvatarImage src={teacherProfile?.profile_photo_url || undefined} alt={teacherProfile?.full_name || user?.user_metadata?.full_name || 'User'} />
+                    <AvatarImage 
+                      src={teacherProfile?.profile_photo_url || schoolProfile?.logo_url || undefined} 
+                      alt={teacherProfile?.full_name || schoolProfile?.school_name || user?.user_metadata?.full_name || 'User'} 
+                    />
                     <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-3xl">
-                      {teacherProfile?.full_name ? getInitials(teacherProfile.full_name) : (user?.user_metadata?.full_name ? getInitials(user.user_metadata.full_name) : 'U')}
+                      {teacherProfile?.full_name 
+                        ? getInitials(teacherProfile.full_name) 
+                        : schoolProfile?.school_name 
+                        ? getInitials(schoolProfile.school_name) 
+                        : (user?.user_metadata?.full_name ? getInitials(user.user_metadata.full_name) : 'U')}
               </AvatarFallback>
             </Avatar>
                   <div className="absolute -bottom-1 -right-1 h-7 w-7 bg-green-500 rounded-full border-3 border-background shadow-lg"></div>
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground break-words">
-                    {teacherProfile?.full_name || user?.user_metadata?.full_name || 'User'}
+                    {teacherProfile?.full_name || schoolProfile?.school_name || user?.user_metadata?.full_name || 'User'}
               </h2>
                   <Badge variant="secondary" className="rounded-full capitalize px-3 sm:px-4 py-1.5 text-xs sm:text-sm">
                   {user?.user_metadata?.role || 'User'}
@@ -185,6 +209,52 @@ export default function Profile() {
                     <div className="space-y-1 md:col-span-2">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bio</p>
                       <p className="text-sm text-foreground leading-relaxed">{teacherProfile.bio}</p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            )}
+
+            {/* School Details Grid - Mobile First */}
+            {isSchool && schoolProfile && (
+              <Card className="p-4 sm:p-6 md:p-8 bg-card border-border shadow-md lg:col-span-2">
+                <h3 className="text-lg sm:text-xl font-bold text-foreground mb-4 sm:mb-6 pb-3 border-b border-border flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  School Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">School Name</p>
+                    <p className="text-base font-medium text-foreground">{schoolProfile.school_name || 'Not set'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">School Type</p>
+                    <Badge variant="secondary" className="rounded-full">
+                      {schoolProfile.school_type || 'Not set'}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Location</p>
+                    <p className="text-base font-medium text-foreground">{schoolProfile.location || 'Not set'}</p>
+                  </div>
+                  {schoolProfile.website && (
+                    <div className="space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Website</p>
+                      <a
+                        href={schoolProfile.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-base font-medium text-primary hover:underline flex items-center gap-1"
+                      >
+                        {schoolProfile.website}
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </div>
+                  )}
+                  {schoolProfile.description && (
+                    <div className="space-y-1 md:col-span-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</p>
+                      <p className="text-sm text-foreground leading-relaxed">{schoolProfile.description}</p>
                     </div>
                   )}
                 </div>

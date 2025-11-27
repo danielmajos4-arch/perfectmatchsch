@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Icon Preview - All Sizes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            text-align: center;
+            color: #1f2937;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #6b7280;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        .icon-card {
+            background: #f9fafb;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 2px solid #e5e7eb;
+        }
+        .icon-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            border-color: #6366F1;
+        }
+        .icon-card img {
+            margin: 20px 0;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+        .size-label {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        .size-info {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+        .usage-section {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 2px solid #e5e7eb;
+        }
+        .usage-section h2 {
+            color: #1f2937;
+            margin-bottom: 20px;
+        }
+        .usage-list {
+            list-style: none;
+            color: #6b7280;
+        }
+        .usage-list li {
+            padding: 10px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .usage-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #10b981;
+            font-weight: bold;
+        }
+        .note {
+            background: #eff6ff;
+            border-left: 4px solid #6366F1;
+            padding: 20px;
+            margin-top: 30px;
+            border-radius: 8px;
+            color: #1e40af;
+        }
+        .note strong {
+            display: block;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 PerfectMatchSchools - PWA Icons Preview</h1>
+        <p class="subtitle">All icon sizes for Progressive Web App implementation</p>
+        
+        <div class="icon-grid">
+            <div class="icon-card">
+                <div class="size-label">16x16</div>
+                <img src="icon-16x16.png" alt="16x16" width="16" height="16">
+                <div class="size-info">Browser favicon</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">32x32</div>
+                <img src="icon-32x32.png" alt="32x32" width="32" height="32">
+                <div class="size-info">Browser favicon</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">72x72</div>
+                <img src="icon-72x72.png" alt="72x72" width="72" height="72">
+                <div class="size-info">Android/General</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">96x96</div>
+                <img src="icon-96x96.png" alt="96x96" width="96" height="96">
+                <div class="size-info">Android/General</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">144x144</div>
+                <img src="icon-144x144.png" alt="144x144" width="144" height="144">
+                <div class="size-info">Windows tiles</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">152x152</div>
+                <img src="icon-152x152.png" alt="152x152" width="152" height="152">
+                <div class="size-info">iOS iPad</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">180x180</div>
+                <img src="icon-180x180.png" alt="180x180" width="180" height="180">
+                <div class="size-info">iOS iPhone</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">192x192</div>
+                <img src="icon-192x192.png" alt="192x192" width="192" height="192">
+                <div class="size-info">Android home screen</div>
+            </div>
+            
+            <div class="icon-card">
+                <div class="size-label">512x512</div>
+                <img src="icon-512x512.png" alt="512x512" style="max-width: 200px; height: auto;">
+                <div class="size-info">Splash screens, install</div>
+            </div>
+        </div>
+        
+        <div class="usage-section">
+            <h2>📱 Icon Usage</h2>
+            <ul class="usage-list">
+                <li><strong>16x16 & 32x32:</strong> Browser tab favicons</li>
+                <li><strong>72x72 & 96x96:</strong> Android app icons (general use)</li>
+                <li><strong>144x144:</strong> Windows tile icons</li>
+                <li><strong>152x152:</strong> iOS iPad app icons</li>
+                <li><strong>180x180:</strong> iOS iPhone app icons (apple-touch-icon)</li>
+                <li><strong>192x192:</strong> Android home screen icons</li>
+                <li><strong>512x512:</strong> Splash screens, install prompts, high-res displays</li>
+            </ul>
+        </div>
+        
+        <div class="note">
+            <strong>📋 Testing Instructions:</strong>
+            <ul style="margin-top: 10px; padding-left: 20px;">
+                <li>Open this file in a browser to preview all icons</li>
+                <li>Check that icons are clear and recognizable at all sizes</li>
+                <li>Verify icons load correctly in browser tabs</li>
+                <li>Test PWA installation on mobile devices</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+

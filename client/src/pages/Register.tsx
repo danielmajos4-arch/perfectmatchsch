@@ -8,11 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import logoUrl from '@assets/New logo-15_1762774603259.png';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 export default function Register() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [intent, setIntent] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -24,8 +27,12 @@ export default function Register() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const roleParam = urlParams.get('role');
+     const intentParam = urlParams.get('intent');
     if (roleParam === 'teacher' || roleParam === 'school') {
       setFormData(prev => ({ ...prev, role: roleParam }));
+    }
+    if (intentParam) {
+      setIntent(intentParam);
     }
   }, [location]);
 
@@ -103,13 +110,25 @@ export default function Register() {
           description: 'Welcome to PerfectMatchSchools. Please check your email to verify your account.',
         });
 
-        // Redirect based on role
+        // Redirect based on role and intent
         // Give a small delay to ensure toast is visible
         setTimeout(() => {
           if (formData.role === 'school') {
-            setLocation('/onboarding/school');
+            if (intent === 'find-teachers' || intent === 'search') {
+              // Schools coming from hero flow - send to school dashboard to find teachers
+              setLocation('/school/dashboard');
+            } else {
+              // Default school onboarding flow
+              setLocation('/onboarding/school');
+            }
           } else if (formData.role === 'teacher') {
-            setLocation('/onboarding/teacher');
+            if (intent === 'browse-schools' || intent === 'search') {
+              // Teachers coming from hero flow - send directly to jobs to browse schools
+              setLocation('/jobs');
+            } else {
+              // Default teacher onboarding flow
+              setLocation('/onboarding/teacher');
+            }
           } else {
             // Fallback to generic dashboard (which will redirect based on role)
             setLocation('/dashboard');
@@ -254,9 +273,14 @@ export default function Register() {
                   </SelectContent>
                 </Select>
                 {isRoleLocked && (
-                  <p className="text-xs text-muted-foreground">
-                    Role is set based on your selection
-                  </p>
+                  <Alert className="mt-3">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {formData.role === 'school'
+                        ? "You're signing up as a School to find teachers"
+                        : "You're signing up as a Teacher to browse schools"}
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
 

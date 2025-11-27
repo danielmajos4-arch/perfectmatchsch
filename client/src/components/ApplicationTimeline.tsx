@@ -6,6 +6,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   CheckCircle2, 
@@ -16,10 +17,15 @@ import {
   XCircle,
   FileText,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  MessageCircle
 } from 'lucide-react';
 import type { Application, Job } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
+import { getOrCreateConversation } from '@/lib/conversationService';
+import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
 
 interface ApplicationTimelineProps {
   application: Application & { job?: Job };
@@ -93,9 +99,55 @@ const STATUS_STEPS: StatusStep[] = [
 ];
 
 export function ApplicationTimeline({ application }: ApplicationTimelineProps) {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
   const currentStatus = application.status as ApplicationStatus;
   const currentStepIndex = STATUS_STEPS.findIndex(s => s.status === currentStatus);
   const currentStep = STATUS_STEPS[currentStepIndex] || STATUS_STEPS[0];
+
+  const handleMessageSchool = async () => {
+    if (!application.job) {
+      toast({
+        title: 'Error',
+        description: 'Job information not available.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Get current user (teacher)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: 'Error',
+          description: 'Please log in to message the school.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Get school user_id from job
+      const schoolUserId = application.job.school_id;
+
+      // Get or create conversation
+      const { conversation } = await getOrCreateConversation(
+        user.id, // teacher_id
+        schoolUserId, // school_id
+        application.job.id // job_id
+      );
+
+      // Navigate to messages with conversation ID
+      navigate(`/messages?conversation=${conversation.id}`);
+    } catch (error: any) {
+      console.error('Error getting conversation:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to open conversation.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Get status history (simulated - in real app, this would come from a status_history table)
   const statusHistory = [
@@ -180,6 +232,16 @@ export function ApplicationTimeline({ application }: ApplicationTimelineProps) {
                   </AvatarFallback>
                 </Avatar>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMessageSchool}
+                className="h-9"
+                title="Message school"
+              >
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Message
+              </Button>
             </div>
           )}
         </div>

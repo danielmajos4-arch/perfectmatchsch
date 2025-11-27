@@ -10,16 +10,21 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Users, Search, Filter, Eye, FileText, Mail, ExternalLink, Star, X, LayoutGrid, List, CheckSquare, Square, Download, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Users, Search, Filter, Eye, FileText, Mail, ExternalLink, Star, X, LayoutGrid, List, CheckSquare, Square, Download, MoreHorizontal, Trash2, MessageCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { getSchoolCandidates, updateCandidateStatus } from '@/lib/matchingService';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { getOrCreateConversation } from '@/lib/conversationService';
+import { supabase } from '@/lib/supabaseClient';
 import { CandidatePipelineView } from '@/components/CandidatePipelineView';
 import { CandidateComparison } from '@/components/CandidateComparison';
 import { PortfolioGallery } from '@/components/PortfolioGallery';
+import { EmailComposerModal } from '@/components/EmailComposerModal';
 import type { CandidateMatchView } from '@shared/matching';
 import { formatDistanceToNow } from 'date-fns';
+import type { Application, Job, Teacher } from '@shared/schema';
+import { useLocation } from 'wouter';
 
 interface CandidateDashboardProps {
   schoolId: string;
@@ -28,6 +33,7 @@ interface CandidateDashboardProps {
 
 export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateMatchView | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -46,6 +52,39 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
   const [bulkStatus, setBulkStatus] = useState<string>('');
   const [bulkNotes, setBulkNotes] = useState('');
   const [comparisonCandidates, setComparisonCandidates] = useState<CandidateMatchView[]>([]);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<Application & { job?: Job; teacher?: Teacher } | null>(null);
+
+  // Handle message button click - navigate to conversation
+  const handleMessageTeacher = async (candidate: CandidateMatchView) => {
+    try {
+      if (!candidate.teacher_id || !schoolId) {
+        toast({
+          title: 'Error',
+          description: 'Missing required information to start conversation.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Get or create conversation
+      const { conversation } = await getOrCreateConversation(
+        candidate.teacher_id,
+        schoolId,
+        candidate.job_id
+      );
+
+      // Navigate to messages with conversation ID
+      navigate(`/messages?conversation=${conversation.id}`);
+    } catch (error: any) {
+      console.error('Error getting conversation:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to open conversation.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const { data: candidates, isLoading } = useQuery<CandidateMatchView[]>({
     queryKey: ['/api/candidates', schoolId, jobId, filters],
@@ -277,7 +316,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
     <div className="space-y-6">
       {/* Header - Mobile First */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+      <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">Candidate Pool</h2>
           <p className="text-sm sm:text-base text-muted-foreground">View and manage candidates matched to your jobs</p>
         </div>
@@ -348,45 +387,45 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
           
           {/* Filters - Grid on mobile, row on desktop */}
           <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-row gap-3 md:gap-4">
-            <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+          <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
               <SelectTrigger className="h-12 w-full md:w-48">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="reviewed">Reviewed</SelectItem>
-                <SelectItem value="contacted">Contacted</SelectItem>
-                <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                <SelectItem value="hired">Hired</SelectItem>
-                <SelectItem value="hidden">Hidden</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filters.archetype} onValueChange={(value) => setFilters({ ...filters, archetype: value })}>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="new">New</SelectItem>
+              <SelectItem value="reviewed">Reviewed</SelectItem>
+              <SelectItem value="contacted">Contacted</SelectItem>
+              <SelectItem value="shortlisted">Shortlisted</SelectItem>
+              <SelectItem value="hired">Hired</SelectItem>
+              <SelectItem value="hidden">Hidden</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filters.archetype} onValueChange={(value) => setFilters({ ...filters, archetype: value })}>
               <SelectTrigger className="h-12 w-full md:w-48">
-                <SelectValue placeholder="Archetype" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Archetypes</SelectItem>
-                <SelectItem value="The Guide">The Guide</SelectItem>
-                <SelectItem value="The Trailblazer">The Trailblazer</SelectItem>
-                <SelectItem value="The Changemaker">The Changemaker</SelectItem>
-                <SelectItem value="The Connector">The Connector</SelectItem>
-                <SelectItem value="The Explorer">The Explorer</SelectItem>
-                <SelectItem value="The Leader">The Leader</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filters.gradeLevel} onValueChange={(value) => setFilters({ ...filters, gradeLevel: value })}>
+              <SelectValue placeholder="Archetype" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Archetypes</SelectItem>
+              <SelectItem value="The Guide">The Guide</SelectItem>
+              <SelectItem value="The Trailblazer">The Trailblazer</SelectItem>
+              <SelectItem value="The Changemaker">The Changemaker</SelectItem>
+              <SelectItem value="The Connector">The Connector</SelectItem>
+              <SelectItem value="The Explorer">The Explorer</SelectItem>
+              <SelectItem value="The Leader">The Leader</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filters.gradeLevel} onValueChange={(value) => setFilters({ ...filters, gradeLevel: value })}>
               <SelectTrigger className="h-12 w-full md:w-48">
-                <SelectValue placeholder="Grade Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Grades</SelectItem>
-                <SelectItem value="Elementary">Elementary</SelectItem>
-                <SelectItem value="Middle School">Middle School</SelectItem>
-                <SelectItem value="High School">High School</SelectItem>
-              </SelectContent>
-            </Select>
+              <SelectValue placeholder="Grade Level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Grades</SelectItem>
+              <SelectItem value="Elementary">Elementary</SelectItem>
+              <SelectItem value="Middle School">Middle School</SelectItem>
+              <SelectItem value="High School">High School</SelectItem>
+            </SelectContent>
+          </Select>
           </div>
         </div>
       </Card>
@@ -468,7 +507,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
       ) : (
         <>
           {/* Candidates List - Mobile First: Cards on mobile, Table on desktop */}
-          {isLoading ? (
+      {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-card border border-card-border rounded-lg animate-pulse" />
@@ -533,6 +572,36 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
                       <Eye className="h-4 w-4 mr-2" />
                       View Profile
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-11 gap-2"
+                      onClick={() => handleMessageTeacher(candidate)}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Message
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-11 gap-2"
+                      onClick={async () => {
+                        // Fetch application data
+                        const { data: application } = await supabase
+                          .from('applications')
+                          .select('*, job:jobs(*), teacher:teachers(*)')
+                          .eq('id', candidate.id)
+                          .single();
+                        
+                        if (application) {
+                          setSelectedApplication(application as any);
+                          setShowEmailModal(true);
+                        }
+                      }}
+                    >
+                      <Mail className="h-4 w-4" />
+                      Email
+                    </Button>
                     <Select
                       value={candidate.status}
                       onValueChange={(value) => handleStatusChange(candidate.id, value)}
@@ -557,9 +626,9 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
 
           {/* Desktop: Table Layout */}
           <Card className="hidden md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
+          <Table>
+            <TableHeader>
+              <TableRow>
                   <TableHead className="w-12">
                     <Checkbox
                       checked={isAllSelected}
@@ -571,91 +640,160 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Candidate</TableHead>
-                  <TableHead>Archetype</TableHead>
-                  <TableHead>Match Score</TableHead>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCandidates.map((candidate) => (
-                  <TableRow key={candidate.id}>
+                <TableHead>Candidate</TableHead>
+                <TableHead>Archetype</TableHead>
+                <TableHead>Match Score</TableHead>
+                <TableHead>Job</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCandidates.map((candidate) => (
+                <TableRow key={candidate.id}>
                     <TableCell>
                       <Checkbox
                         checked={selectedCandidates.has(candidate.id)}
                         onCheckedChange={(checked) => handleSelectCandidate(candidate.id, checked as boolean)}
                       />
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                            {getInitials(candidate.teacher_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-semibold text-foreground">{candidate.teacher_name}</p>
-                          <p className="text-sm text-muted-foreground">{candidate.teacher_email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="rounded-full">
-                        {candidate.teacher_archetype || 'N/A'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{candidate.match_score}</span>
-                        <span className="text-xs text-muted-foreground">pts</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                          {getInitials(candidate.teacher_name)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div>
-                        <p className="font-medium text-foreground">{candidate.job_title}</p>
-                        <p className="text-sm text-muted-foreground">{candidate.school_name}</p>
+                        <p className="font-semibold text-foreground">{candidate.teacher_name}</p>
+                        <p className="text-sm text-muted-foreground">{candidate.teacher_email}</p>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(candidate.status)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedCandidate(candidate);
-                            setShowProfileModal(true);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Select
-                          value={candidate.status}
-                          onValueChange={(value) => handleStatusChange(candidate.id, value)}
-                        >
-                          <SelectTrigger className="h-8 w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="new">New</SelectItem>
-                            <SelectItem value="reviewed">Reviewed</SelectItem>
-                            <SelectItem value="contacted">Contacted</SelectItem>
-                            <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                            <SelectItem value="hired">Hired</SelectItem>
-                            <SelectItem value="hidden">Hidden</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="rounded-full">
+                      {candidate.teacher_archetype || 'N/A'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{candidate.match_score}</span>
+                      <span className="text-xs text-muted-foreground">pts</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium text-foreground">{candidate.job_title}</p>
+                      <p className="text-sm text-muted-foreground">{candidate.school_name}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {getStatusBadge(candidate.status)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setSelectedCandidate(candidate);
+                          setShowProfileModal(true);
+                        }}
+                        title="View Profile"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleMessageTeacher(candidate)}
+                        title="Message Teacher"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={async () => {
+                          // Fetch application data with job and teacher
+                          const { data: application, error } = await supabase
+                            .from('applications')
+                            .select(`
+                              *,
+                              job:jobs(*),
+                              teacher:teachers(*)
+                            `)
+                            .eq('id', candidate.application_id || candidate.id)
+                            .single();
+                          
+                          if (error) {
+                            console.error('Error fetching application:', error);
+                            toast({
+                              title: 'Error',
+                              description: 'Failed to load application data.',
+                              variant: 'destructive',
+                            });
+                            return;
+                          }
+                          
+                          if (application) {
+                            // Also fetch job if not included
+                            let job = application.job;
+                            if (!job && candidate.job_id) {
+                              const { data: jobData } = await supabase
+                                .from('jobs')
+                                .select('*')
+                                .eq('id', candidate.job_id)
+                                .single();
+                              job = jobData;
+                            }
+                            
+                            // Also fetch teacher if not included
+                            let teacher = application.teacher;
+                            if (!teacher && candidate.teacher_id) {
+                              const { data: teacherData } = await supabase
+                                .from('teachers')
+                                .select('*')
+                                .eq('user_id', candidate.teacher_id)
+                                .single();
+                              teacher = teacherData;
+                            }
+                            
+                            setSelectedApplication({
+                              ...application,
+                              job: job as Job,
+                              teacher: teacher as Teacher,
+                            } as any);
+                            setShowEmailModal(true);
+                          }
+                        }}
+                        title="Email Applicant"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
+                      <Select
+                        value={candidate.status}
+                        onValueChange={(value) => handleStatusChange(candidate.id, value)}
+                      >
+                        <SelectTrigger className="h-8 w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">New</SelectItem>
+                          <SelectItem value="reviewed">Reviewed</SelectItem>
+                          <SelectItem value="contacted">Contacted</SelectItem>
+                          <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                          <SelectItem value="hired">Hired</SelectItem>
+                          <SelectItem value="hidden">Hidden</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
         </>
       ) : (
         <Card className="p-8 text-center">
@@ -903,6 +1041,23 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Email Composer Modal */}
+      {selectedApplication && selectedApplication.job && (
+        <EmailComposerModal
+          isOpen={showEmailModal}
+          onClose={() => {
+            setShowEmailModal(false);
+            setSelectedApplication(null);
+          }}
+          application={selectedApplication}
+          job={selectedApplication.job}
+          teacher={selectedApplication.teacher || null}
+          onSent={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/candidates'] });
+          }}
+        />
+      )}
     </div>
   );
 }

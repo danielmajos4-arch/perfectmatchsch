@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -25,44 +25,6 @@ export function ArchetypeQuiz({ quizData, onComplete, onBack, loading }: Archety
   const progress = totalQuestions > 0 ? ((currentQuestionIndex + 1) / totalQuestions) * 100 : 0;
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
   const canGoNext = answers[currentQuestion?.question_id];
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('=== ARCHETYPE QUIZ DEBUG ===');
-    console.log('Quiz Data Summary:', {
-      totalQuestions,
-      currentQuestionIndex,
-      allQuestions: quizData.map(q => ({
-        question_id: q.question_id,
-        question: q.question?.substring(0, 40) + '...',
-        optionsCount: q.options?.length || 0
-      }))
-    });
-    
-    if (currentQuestion) {
-      console.log('Current Question Details:', {
-        question_id: currentQuestion.question_id,
-        question: currentQuestion.question,
-        optionsCount: currentQuestion.options?.length || 0,
-        options: currentQuestion.options?.map((o: any) => ({
-          id: o.id,
-          text: o.text?.substring(0, 50) + '...',
-          hasScores: !!o.scores
-        })) || []
-      });
-      
-      // CRITICAL: Check if options exist
-      if (!currentQuestion.options || currentQuestion.options.length === 0) {
-        console.error('❌ CRITICAL: Current question has NO OPTIONS!');
-        console.error('Question:', currentQuestion);
-      } else {
-        console.log('✅ Current question has', currentQuestion.options.length, 'options');
-      }
-    } else {
-      console.warn('⚠️ No current question available');
-    }
-  }, [quizData, currentQuestionIndex, currentQuestion, totalQuestions]);
-  
   if (totalQuestions === 0) {
     return (
       <Alert variant="destructive" data-testid="alert-no-questions">

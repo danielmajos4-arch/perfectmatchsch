@@ -7,6 +7,11 @@
 import { supabase } from './supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 
+// Circuit breaker to prevent achievement system spam
+let achievementErrorCount = 0;
+const MAX_ACHIEVEMENT_ERRORS = 3;
+let achievementSystemDisabled = false;
+
 export interface Achievement {
   id: string;
   code: string;
@@ -31,11 +36,37 @@ export interface AchievementProgress {
 /**
  * Check and unlock achievements for a user
  * This should be called after significant user actions
+ * 
+ * Circuit breaker: Stops trying after multiple failures to prevent spam
+ * 
+ * NOTE: Achievements are only for teachers. School users should not call this function.
  */
 export async function checkAndUnlockAchievements(
   userId: string,
   achievementCode?: string
 ): Promise<Achievement[]> {
+  // Stop trying if system is disabled due to repeated failures
+  if (achievementSystemDisabled) {
+    return [];
+  }
+
+  // Verify user is a teacher before checking achievements
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      return [];
+    }
+    
+    const userRole = userData.user.user_metadata?.role;
+    // Only check achievements for teachers
+    if (userRole !== 'teacher') {
+      return [];
+    }
+  } catch {
+    // If we can't verify role, skip achievement check to avoid errors
+    return [];
+  }
+
   try {
     const { data, error } = await supabase.rpc('check_and_unlock_achievements', {
       p_user_id: userId,
@@ -43,19 +74,40 @@ export async function checkAndUnlockAchievements(
     });
 
     if (error) {
+      achievementErrorCount++;
+      
+      // Disable system after too many failures
+      if (achievementErrorCount >= MAX_ACHIEVEMENT_ERRORS) {
+        console.warn('Achievement system disabled after multiple failures. Function may not exist in database.');
+        achievementSystemDisabled = true;
+        return [];
+      }
+
       // Silently handle database function errors (e.g., "record not assigned yet")
       // These are typically database schema/function issues, not critical app errors
       if (error.code === '55000' || error.message?.includes('not assigned yet')) {
         // Database function error - return empty array silently
         return [];
       }
-      // Only log non-database-function errors
-      console.error('Error checking achievements:', error);
+      
+      // Only log first few errors, then silence
+      if (achievementErrorCount <= 2) {
+        console.warn('Achievement check failed (non-critical):', error.message);
+      }
       return [];
     }
 
+    // Reset error count on success
+    achievementErrorCount = 0;
     return data || [];
   } catch (error) {
+    achievementErrorCount++;
+    
+    if (achievementErrorCount >= MAX_ACHIEVEMENT_ERRORS) {
+      console.warn('Achievement system disabled after multiple failures.');
+      achievementSystemDisabled = true;
+    }
+    
     // Silently handle errors - achievements are non-critical
     return [];
   }
@@ -63,8 +115,26 @@ export async function checkAndUnlockAchievements(
 
 /**
  * Get all unlocked achievements for a user
+ * NOTE: Achievements are only for teachers. School users should not call this function.
  */
 export async function getUserAchievements(userId: string): Promise<Achievement[]> {
+  // Verify user is a teacher before fetching achievements
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      return [];
+    }
+    
+    const userRole = userData.user.user_metadata?.role;
+    // Only fetch achievements for teachers
+    if (userRole !== 'teacher') {
+      return [];
+    }
+  } catch {
+    // If we can't verify role, skip to avoid errors
+    return [];
+  }
+
   try {
     const { data, error } = await supabase.rpc('get_user_achievements', {
       p_user_id: userId,
@@ -84,10 +154,28 @@ export async function getUserAchievements(userId: string): Promise<Achievement[]
 
 /**
  * Get achievement progress for locked achievements
+ * NOTE: Achievements are only for teachers. School users should not call this function.
  */
 export async function getUserAchievementProgress(
   userId: string
 ): Promise<AchievementProgress[]> {
+  // Verify user is a teacher before fetching achievement progress
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      return [];
+    }
+    
+    const userRole = userData.user.user_metadata?.role;
+    // Only fetch achievement progress for teachers
+    if (userRole !== 'teacher') {
+      return [];
+    }
+  } catch {
+    // If we can't verify role, skip to avoid errors
+    return [];
+  }
+
   try {
     const { data, error } = await supabase.rpc('get_user_achievement_progress', {
       p_user_id: userId,

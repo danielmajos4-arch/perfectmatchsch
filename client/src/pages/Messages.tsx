@@ -1,29 +1,44 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useLocation } from 'wouter';
+import { useSearch } from 'wouter';
 import { AuthenticatedLayout } from '@/components/AuthenticatedLayout';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, Send, ArrowLeft } from 'lucide-react';
+import { Search as SearchIcon, Send, ArrowLeft, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import type { Conversation, Message, User } from '@shared/schema';
+import { notifyNewMessage } from '@/lib/notificationService';
+import type { Conversation, Message } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+type TeacherProfile = {
+  id: string;
+  user_id: string;
+  full_name: string;
+  profile_photo_url: string | null;
+} | null;
+
+type SchoolProfile = {
+  id: string;
+  user_id: string;
+  school_name: string;
+  logo_url: string | null;
+} | null;
 
 type ConversationWithUsers = Conversation & {
-  teacher: User;
-  school: User;
+  teacher: TeacherProfile;
+  school: SchoolProfile;
+  job?: { id: string; title: string; school_name: string } | null;
   messages: Message[];
-  teacher_profile?: { profile_photo_url: string | null; full_name: string } | null;
-  school_profile?: { logo_url: string | null; school_name: string } | null;
 };
 
 export default function Messages() {
   const { toast } = useToast();
-  const [location] = useLocation();
+  const search = useSearch();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,14 +46,13 @@ export default function Messages() {
 
   // Check for conversation ID in URL query params
   useEffect(() => {
-    const params = new URLSearchParams(location.split('?')[1]);
+    if (!search) return;
+    const params = new URLSearchParams(search);
     const conversationId = params.get('conversation');
     if (conversationId) {
       setSelectedConversation(conversationId);
-      // Clean up URL
-      window.history.replaceState({}, '', '/messages');
     }
-  }, [location]);
+  }, [search]);
 
   const { data: user } = useQuery({
     queryKey: ['/api/auth/user'],
@@ -48,40 +62,100 @@ export default function Messages() {
     },
   });
 
-  const { data: conversations, isLoading } = useQuery<ConversationWithUsers[]>({
-    queryKey: ['/api/conversations', user?.id],
-    queryFn: async () => {
-      const isTeacher = user?.user_metadata?.role === 'teacher';
-      const field = isTeacher ? 'teacher_id' : 'school_id';
+  const role = user?.user_metadata?.role as 'teacher' | 'school' | undefined;
 
-      const { data, error } = await supabase
+  const {
+    data: conversations,
+    isLoading,
+    error: conversationsError,
+  } = useQuery<ConversationWithUsers[]>({
+    queryKey: ['/api/conversations', user?.id, role],
+    queryFn: async () => {
+      if (!user?.id || !role) {
+        throw new Error('User not loaded');
+      }
+
+      let profileId: string | null = null;
+
+      if (role === 'teacher') {
+        const { data: teacher, error } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        if (error) throw error;
+        profileId = teacher?.id || null;
+      } else {
+        const { data: school, error } = await supabase
+          .from('schools')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        if (error) throw error;
+        profileId = school?.id || null;
+      }
+
+      if (!profileId) {
+        throw new Error('User profile not found');
+      }
+
+      let query = supabase
         .from('conversations')
         .select(`
-          *, 
-          teacher:users!teacher_id(*), 
-          school:users!school_id(*), 
+          id,
+          teacher_id,
+          school_id,
+          job_id,
+          last_message_at,
+          created_at,
           messages(*),
-          teacher_profile:teachers!teacher_id(profile_photo_url, full_name),
-          school_profile:schools!school_id(logo_url, school_name)
+          teacher:teachers!teacher_id(
+            id,
+            user_id,
+            full_name,
+            profile_photo_url
+          ),
+          school:schools!school_id(
+            id,
+            user_id,
+            school_name,
+            logo_url
+          ),
+          job:jobs(
+            id,
+            title,
+            school_name
+          )
         `)
-        .eq(field, user?.id)
         .order('last_message_at', { ascending: false });
 
-      if (error) throw error;
-      return data as any;
+      if (role === 'teacher') {
+        query = query.eq('teacher_id', profileId);
+      } else {
+        query = query.eq('school_id', profileId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        throw error;
+      }
+
+      return data as ConversationWithUsers[];
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !!role,
   });
 
   const selectedConv = conversations?.find((c) => c.id === selectedConversation);
 
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedConversation || !messageText.trim()) return;
+      if (!selectedConversation || !messageText.trim() || !user?.id) return;
 
       const { error } = await supabase.from('messages').insert({
         conversation_id: selectedConversation,
-        sender_id: user?.id,
+        sender_id: user.id,
         content: messageText.trim(),
       });
 
@@ -92,6 +166,26 @@ export default function Messages() {
         .from('conversations')
         .update({ last_message_at: new Date().toISOString() })
         .eq('id', selectedConversation);
+
+      // Notify recipient (non-blocking)
+      try {
+        const selectedConv = conversations?.find(c => c.id === selectedConversation);
+        if (selectedConv) {
+          const isTeacher = user.user_metadata?.role === 'teacher';
+          const recipientId = isTeacher ? selectedConv.school_id : selectedConv.teacher_id;
+          const senderName = isTeacher 
+            ? (selectedConv.teacher?.full_name || 'A teacher')
+            : (selectedConv.school?.full_name || 'A school');
+          
+          await notifyNewMessage(
+            recipientId,
+            selectedConversation,
+            senderName
+          );
+        }
+      } catch (notifError) {
+        console.error('Error sending message notification:', notifError);
+      }
     },
     onSuccess: () => {
       setMessageText('');
@@ -173,24 +267,26 @@ export default function Messages() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedConv?.messages]);
 
-  const filteredConversations = conversations?.filter((conv) => {
-    const otherUser = user?.user_metadata?.role === 'teacher' ? conv.school : conv.teacher;
-    return otherUser.full_name.toLowerCase().includes(searchQuery.toLowerCase());
-  });
-
-  const getOtherUser = (conv: ConversationWithUsers) => {
-    return user?.user_metadata?.role === 'teacher' ? conv.school : conv.teacher;
-  };
-
-  const getOtherUserPhoto = (conv: ConversationWithUsers) => {
-    if (user?.user_metadata?.role === 'teacher') {
-      // If teacher, show school logo
-      return conv.school_profile?.logo_url || null;
-    } else {
-      // If school, show teacher profile photo
-      return conv.teacher_profile?.profile_photo_url || null;
+  const getOtherParty = (conv: ConversationWithUsers) => {
+    if (role === 'teacher') {
+      return {
+        name: conv.school?.school_name || 'School',
+        photo: conv.school?.logo_url || null,
+        userId: conv.school?.user_id || null,
+      };
     }
+
+    return {
+      name: conv.teacher?.full_name || 'Teacher',
+      photo: conv.teacher?.profile_photo_url || null,
+      userId: conv.teacher?.user_id || null,
+    };
   };
+
+  const filteredConversations = conversations?.filter((conv) => {
+    const otherParty = getOtherParty(conv);
+    return otherParty.name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const getInitials = (name: string) => {
     return name
@@ -200,6 +296,32 @@ export default function Messages() {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  if (isLoading) {
+    return (
+      <AuthenticatedLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+          <p className="text-muted-foreground">Loading conversations...</p>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
+
+  if (conversationsError) {
+    return (
+      <AuthenticatedLayout>
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)] px-4">
+          <Alert variant="destructive" className="max-w-lg">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>
+              Failed to load conversations: {conversationsError.message}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
 
   return (
     <AuthenticatedLayout showMobileNav>
@@ -213,7 +335,7 @@ export default function Messages() {
           {/* Search */}
           <div className="p-4 border-b border-card-border">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 type="search"
                 placeholder="Search conversations..."
@@ -227,15 +349,9 @@ export default function Messages() {
 
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto">
-            {isLoading ? (
-              <div className="space-y-2 p-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-20 bg-muted rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : filteredConversations && filteredConversations.length > 0 ? (
+            {filteredConversations && filteredConversations.length > 0 ? (
               filteredConversations.map((conv) => {
-                const otherUser = getOtherUser(conv);
+                const otherParty = getOtherParty(conv);
                 const lastMessage = conv.messages?.[conv.messages.length - 1];
                 const unreadCount = conv.messages?.filter(
                   (msg) => !msg.is_read && msg.sender_id !== user?.id
@@ -251,15 +367,15 @@ export default function Messages() {
                     data-testid={`conversation-${conv.id}`}
                   >
                     <Avatar className="h-12 w-12">
-                      <AvatarImage src={getOtherUserPhoto(conv) || undefined} alt={otherUser.full_name} />
+                      <AvatarImage src={otherParty.photo || undefined} alt={otherParty.name} />
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {getInitials(otherUser.full_name)}
+                        {getInitials(otherParty.name)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
                         <span className={`font-semibold truncate ${unreadCount > 0 ? 'text-foreground font-bold' : 'text-foreground'}`}>
-                          {otherUser.full_name}
+                          {otherParty.name}
                         </span>
                         <div className="flex items-center gap-2">
                           {unreadCount > 0 && (
@@ -274,6 +390,11 @@ export default function Messages() {
                         )}
                       </div>
                       </div>
+                      {conv.job && (
+                        <p className="text-xs text-muted-foreground truncate mb-1">
+                          {conv.job.title}
+                        </p>
+                      )}
                       <p className={`text-sm truncate ${unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                         {lastMessage?.content || 'No messages yet'}
                       </p>
@@ -294,30 +415,52 @@ export default function Messages() {
           {selectedConv ? (
             <>
               {/* Header */}
-              <div className="p-4 border-b border-border flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden"
-                  onClick={() => setSelectedConversation(null)}
-                  data-testid="button-back"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={getOtherUserPhoto(selectedConv) || undefined} alt={getOtherUser(selectedConv).full_name} />
-                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                    {getInitials(getOtherUser(selectedConv).full_name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="font-semibold text-foreground">
-                    {getOtherUser(selectedConv).full_name}
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    {user?.user_metadata?.role === 'teacher' ? 'School' : 'Teacher'}
-                  </p>
+              <div className="p-4 border-b border-border">
+                <div className="flex items-center gap-3 mb-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="md:hidden"
+                    onClick={() => setSelectedConversation(null)}
+                    data-testid="button-back"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={getOtherParty(selectedConv).photo || undefined} alt={getOtherParty(selectedConv).name} />
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                      {getInitials(getOtherParty(selectedConv).name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <h2 className="font-semibold text-foreground">
+                      {getOtherParty(selectedConv).name}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {user?.user_metadata?.role === 'teacher' ? 'School' : 'Teacher'}
+                    </p>
+                  </div>
                 </div>
+                {selectedConv.job && (
+                  <div className="mt-2 pt-2 border-t border-border">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{selectedConv.job.title}</p>
+                        <p className="text-xs text-muted-foreground">{selectedConv.job.school_name}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          window.location.href = `/school/dashboard#applications`;
+                        }}
+                        className="h-8 text-xs"
+                      >
+                        View Application
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Messages */}

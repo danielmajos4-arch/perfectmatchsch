@@ -14,6 +14,7 @@ import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { Job } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
+import { ProfileCompletionGate } from '@/components/ProfileCompletionGate';
 
 export default function JobDetail() {
   const [, params] = useRoute('/jobs/:id');
@@ -43,6 +44,26 @@ export default function JobDetail() {
       const { data } = await supabase.auth.getUser();
       return data.user;
     },
+  });
+
+  // Check if teacher has already applied
+  const { data: existingApplication } = useQuery({
+    queryKey: ['application-status', job?.id, user?.id],
+    queryFn: async () => {
+      if (!user?.id || !job?.id) return null;
+      const { data, error } = await supabase
+        .from('applications')
+        .select('id, status')
+        .eq('job_id', job.id)
+        .eq('teacher_id', user.id)
+        .maybeSingle();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking application status:', error);
+      }
+      return data;
+    },
+    enabled: !!user?.id && !!job?.id && user?.user_metadata?.role === 'teacher',
   });
 
   // Get school user_id from job (job.school_id is already a user_id)
@@ -97,7 +118,7 @@ export default function JobDetail() {
 
   const isTeacher = user?.user_metadata?.role === 'teacher';
 
-  return (
+  const content = (
     <AuthenticatedLayout>
       <div className="px-4 md:px-8 py-6 md:py-12 max-w-6xl mx-auto">
         <div className="lg:grid lg:grid-cols-3 lg:gap-8">
@@ -186,16 +207,36 @@ export default function JobDetail() {
           {/* Sidebar - Hidden on mobile (use fixed bottom button instead) */}
           <div className="hidden lg:block lg:col-span-1">
             <div className="lg:sticky lg:top-24 space-y-6">
-              {/* Apply Button */}
+              {/* Apply Button or Status */}
               {isTeacher && (
                 <div className="space-y-3">
-                <Button
-                  className="w-full h-12 font-medium"
-                  onClick={() => setShowApplicationModal(true)}
-                  data-testid="button-apply"
-                >
-                  Apply for this Position
-                </Button>
+                  {existingApplication ? (
+                    <Card className="p-4 border rounded-lg">
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-2">Application Status</p>
+                          <Badge variant="secondary" className="text-sm">
+                            {existingApplication.status || 'Pending'}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="w-full h-12 font-medium"
+                          onClick={() => setLocation('/teacher/dashboard#applications')}
+                        >
+                          View My Applications
+                        </Button>
+                      </div>
+                    </Card>
+                  ) : (
+                    <Button
+                      className="w-full h-12 font-medium"
+                      onClick={() => setShowApplicationModal(true)}
+                      data-testid="button-apply"
+                    >
+                      Apply for this Position
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     className="w-full h-12 font-medium gap-2"
@@ -244,13 +285,27 @@ export default function JobDetail() {
                 <MessageCircle className="h-5 w-5" />
                 {startConversationMutation.isPending ? 'Starting...' : 'Message'}
               </Button>
-              <Button
-                className="flex-1 h-12 font-medium"
-                onClick={() => setShowApplicationModal(true)}
-                data-testid="button-apply-mobile"
-              >
-                Apply Now
-              </Button>
+              {existingApplication ? (
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 font-medium"
+                  onClick={() => setLocation('/teacher/dashboard#applications')}
+                  data-testid="button-view-applications-mobile"
+                >
+                  <Badge variant="secondary" className="mr-2">
+                    {existingApplication.status || 'Applied'}
+                  </Badge>
+                  View
+                </Button>
+              ) : (
+                <Button
+                  className="flex-1 h-12 font-medium"
+                  onClick={() => setShowApplicationModal(true)}
+                  data-testid="button-apply-mobile"
+                >
+                  Apply Now
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -274,4 +329,14 @@ export default function JobDetail() {
       )}
     </AuthenticatedLayout>
   );
+
+  if (isTeacher) {
+    return (
+      <ProfileCompletionGate>
+        {content}
+      </ProfileCompletionGate>
+    );
+  }
+
+  return content;
 }

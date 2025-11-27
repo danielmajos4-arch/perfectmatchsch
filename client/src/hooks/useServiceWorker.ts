@@ -11,23 +11,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getRegistration, checkForUpdates } from '@/lib/serviceWorker';
 
-interface ServiceWorkerState {
+export interface ServiceWorkerState {
   isSupported: boolean;
   isRegistered: boolean;
-  isUpdateAvailable: boolean;
+  updateAvailable: boolean;
   isInstalling: boolean;
   isOffline: boolean;
   registration: ServiceWorkerRegistration | null;
+  error: Error | null;
 }
 
 export function useServiceWorker() {
   const [state, setState] = useState<ServiceWorkerState>({
     isSupported: 'serviceWorker' in navigator,
     isRegistered: false,
-    isUpdateAvailable: false,
+    updateAvailable: false,
     isInstalling: false,
     isOffline: !navigator.onLine,
     registration: null,
+    error: null,
   });
 
   // Check for service worker registration
@@ -63,7 +65,7 @@ export function useServiceWorker() {
                     // New version available
                     setState((prev) => ({
                       ...prev,
-                      isUpdateAvailable: true,
+                      updateAvailable: true,
                       isInstalling: false,
                     }));
                   } else {
@@ -77,7 +79,7 @@ export function useServiceWorker() {
                   setState((prev) => ({
                     ...prev,
                     isInstalling: false,
-                    isUpdateAvailable: false,
+                    updateAvailable: false,
                   }));
                 }
               });
@@ -88,12 +90,22 @@ export function useServiceWorker() {
           if (registration.waiting) {
             setState((prev) => ({
               ...prev,
-              isUpdateAvailable: true,
+              updateAvailable: true,
             }));
           }
+        } else {
+          setState((prev) => ({
+            ...prev,
+            isRegistered: false,
+          }));
         }
       } catch (error) {
-        console.error('[useServiceWorker] Error checking registration:', error);
+        const err = error instanceof Error ? error : new Error(String(error));
+        console.error('[useServiceWorker] Error checking registration:', err);
+        setState((prev) => ({
+          ...prev,
+          error: err,
+        }));
       }
     }
 
@@ -137,8 +149,8 @@ export function useServiceWorker() {
     };
   }, [state.isSupported]);
 
-  // Install update
-  const installUpdate = useCallback(async () => {
+  // Update service worker
+  const updateServiceWorker = useCallback(async () => {
     if (!state.registration || !state.registration.waiting) {
       return;
     }
@@ -152,7 +164,12 @@ export function useServiceWorker() {
         isInstalling: true,
       }));
     } catch (error) {
-      console.error('[useServiceWorker] Error installing update:', error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error('[useServiceWorker] Error updating service worker:', err);
+      setState((prev) => ({
+        ...prev,
+        error: err,
+      }));
     }
   }, [state.registration]);
 
@@ -170,9 +187,11 @@ export function useServiceWorker() {
   }, [state.isSupported]);
 
   return {
-    ...state,
-    installUpdate,
-    checkUpdate,
+    isSupported: state.isSupported,
+    isRegistered: state.isRegistered,
+    updateAvailable: state.updateAvailable,
+    updateServiceWorker: updateServiceWorker,
+    error: state.error,
   };
 }
 

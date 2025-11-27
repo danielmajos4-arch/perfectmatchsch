@@ -6,6 +6,8 @@ import { JobCard } from '@/components/JobCard';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdvancedJobFilters, type JobFilters } from '@/components/AdvancedJobFilters';
 import { SavedSearches } from '@/components/SavedSearches';
@@ -16,10 +18,18 @@ import { supabase } from '@/lib/supabaseClient';
 import { addToSearchHistory } from '@/lib/savedSearchService';
 import type { Job } from '@shared/schema';
 import { subDays, subWeeks, subMonths } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
+import { ProfileCompletionGate } from '@/components/ProfileCompletionGate';
+
+type SortOption = 'date' | 'salary-desc' | 'salary-asc' | 'relevance';
 
 export default function Jobs() {
+  const { role } = useAuth();
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortOption>('date');
+  const [currentPage, setCurrentPage] = useState(1);
+  const jobsPerPage = 10;
   const [filters, setFilters] = useState<Partial<JobFilters>>({
     subject: 'all',
     gradeLevel: 'all',
@@ -59,20 +69,25 @@ export default function Jobs() {
         .order('posted_at', { ascending: false });
 
       if (error) throw error;
-      return data as Job[];
+      
+      // Map employment_type to job_type for UI consistency
+      return (data || []).map(job => ({
+        ...job,
+        job_type: (job as any).employment_type || (job as any).job_type
+      })) as Job[];
     },
   });
 
   const filteredJobs = useMemo(() => {
     if (!jobs) return [];
 
-    return jobs.filter((job) => {
+    const filtered = jobs.filter((job) => {
       // Search query
-      const matchesSearch =
+    const matchesSearch =
         !searchQuery ||
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.school_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.location.toLowerCase().includes(searchQuery.toLowerCase());
+      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.school_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      job.location.toLowerCase().includes(searchQuery.toLowerCase());
 
       // Subject filter
       const matchesSubject = !filters.subject || filters.subject === 'all' || job.subject === filters.subject;
@@ -131,7 +146,58 @@ export default function Jobs() {
              matchesJobType && matchesSalary && matchesDatePosted && 
              matchesLocation && matchesBenefits;
     });
-  }, [jobs, searchQuery, filters]);
+
+    // Sort filtered jobs
+    const sorted = [...filtered];
+    switch (sortBy) {
+      case 'date':
+        sorted.sort((a, b) => new Date(b.posted_at).getTime() - new Date(a.posted_at).getTime());
+        break;
+      case 'salary-desc':
+        sorted.sort((a, b) => {
+          const aSalary = parseInt(a.salary.replace(/[^0-9]/g, '')) || 0;
+          const bSalary = parseInt(b.salary.replace(/[^0-9]/g, '')) || 0;
+          return bSalary - aSalary;
+        });
+        break;
+      case 'salary-asc':
+        sorted.sort((a, b) => {
+          const aSalary = parseInt(a.salary.replace(/[^0-9]/g, '')) || 0;
+          const bSalary = parseInt(b.salary.replace(/[^0-9]/g, '')) || 0;
+          return aSalary - bSalary;
+        });
+        break;
+      case 'relevance':
+        // Sort by relevance (title match > school name match > location match)
+        sorted.sort((a, b) => {
+          const query = searchQuery.toLowerCase();
+          const aTitle = a.title.toLowerCase().includes(query) ? 3 : 0;
+          const aSchool = a.school_name.toLowerCase().includes(query) ? 2 : 0;
+          const aLocation = a.location.toLowerCase().includes(query) ? 1 : 0;
+          const aScore = aTitle + aSchool + aLocation;
+          
+          const bTitle = b.title.toLowerCase().includes(query) ? 3 : 0;
+          const bSchool = b.school_name.toLowerCase().includes(query) ? 2 : 0;
+          const bLocation = b.location.toLowerCase().includes(query) ? 1 : 0;
+          const bScore = bTitle + bSchool + bLocation;
+          
+          return bScore - aScore;
+        });
+        break;
+    }
+    return sorted;
+  }, [jobs, searchQuery, filters, sortBy]);
+
+  // Pagination
+  const totalPages = Math.ceil((filteredJobs?.length || 0) / jobsPerPage);
+  const startIndex = (currentPage - 1) * jobsPerPage;
+  const endIndex = startIndex + jobsPerPage;
+  const paginatedJobs = filteredJobs?.slice(startIndex, endIndex) || [];
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, JSON.stringify(filters), sortBy]);
 
   // Save search to history when filters change (debounced)
   useEffect(() => {
@@ -152,7 +218,7 @@ export default function Jobs() {
     }
   }, [user?.id, searchQuery, JSON.stringify(filters), filteredJobs.length]);
 
-  return (
+  const content = (
     <AuthenticatedLayout>
       <div className="px-4 md:px-8 py-8 md:py-12 max-w-6xl mx-auto">
         {/* Header - Mobile First */}
@@ -185,26 +251,42 @@ export default function Jobs() {
               />
             )}
           </div>
-          <Select 
-            value={filters.subject || 'all'} 
-            onValueChange={(value) => setFilters({ ...filters, subject: value })}
-          >
-            <SelectTrigger className="h-12 w-full sm:w-full md:w-64 text-base" data-testid="select-subject">
-              <SelectValue placeholder="All Subjects" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Subjects</SelectItem>
-              <SelectItem value="Mathematics">Mathematics</SelectItem>
-              <SelectItem value="English">English</SelectItem>
-              <SelectItem value="Science">Science</SelectItem>
-              <SelectItem value="History">History</SelectItem>
-              <SelectItem value="Art">Art</SelectItem>
-              <SelectItem value="Music">Music</SelectItem>
-              <SelectItem value="Physical Education">Physical Education</SelectItem>
-              <SelectItem value="Special Education">Special Education</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select 
+              value={filters.subject || 'all'} 
+              onValueChange={(value) => setFilters({ ...filters, subject: value })}
+            >
+              <SelectTrigger className="h-12 w-full sm:w-full md:w-64 text-base" data-testid="select-subject">
+                <SelectValue placeholder="All Subjects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Subjects</SelectItem>
+                <SelectItem value="Mathematics">Mathematics</SelectItem>
+                <SelectItem value="English">English</SelectItem>
+                <SelectItem value="Science">Science</SelectItem>
+                <SelectItem value="History">History</SelectItem>
+                <SelectItem value="Art">Art</SelectItem>
+                <SelectItem value="Music">Music</SelectItem>
+                <SelectItem value="Physical Education">Physical Education</SelectItem>
+                <SelectItem value="Special Education">Special Education</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Label htmlFor="sort" className="text-sm font-medium whitespace-nowrap hidden sm:inline">Sort:</Label>
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+              <SelectTrigger id="sort" className="h-12 w-full sm:w-[200px] text-base">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Date Posted (Newest)</SelectItem>
+                <SelectItem value="salary-desc">Salary (High to Low)</SelectItem>
+                <SelectItem value="salary-asc">Salary (Low to High)</SelectItem>
+                <SelectItem value="relevance">Relevance</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Advanced Filters & Saved Searches */}
@@ -301,13 +383,77 @@ export default function Jobs() {
 
         {/* Job List */}
         {!isLoading && filteredJobs && filteredJobs.length > 0 && (
+          <>
           <div className="space-y-4">
-            {filteredJobs.map((job) => (
-              <JobCard key={job.id} job={job} />
+              {paginatedJobs.map((job) => (
+                <JobCard key={job.id} job={job} showQuickApply={true} />
             ))}
           </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 pt-6 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {startIndex + 1} - {Math.min(endIndex, filteredJobs.length)} of {filteredJobs.length} jobs
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="h-10"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className="h-10 w-10"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-10"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </AuthenticatedLayout>
   );
+
+  // For teachers, wrap content in profile completion gate
+  if (role === 'teacher') {
+    return <ProfileCompletionGate>{content}</ProfileCompletionGate>;
+  }
+
+  // Schools and unauthenticated users see jobs page normally
+  return content;
 }

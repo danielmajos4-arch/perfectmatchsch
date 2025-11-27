@@ -1,0 +1,50 @@
+<!-- Concept 1 (Modern): Sleek Connection -->
+<!-- Minimalist design: Two geometric shapes connected by a smooth curve -->
+<!-- Modern flat design with subtle gradients -->
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="modernGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="modernGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background - Rounded square for modern look -->
+  <rect x="56" y="56" width="400" height="400" rx="80" fill="url(#modernGrad1)"/>
+  
+  <!-- Left shape - School (simplified building) -->
+  <g transform="translate(180, 200)">
+    <!-- Modern building silhouette -->
+    <rect x="0" y="0" width="60" height="80" rx="8" fill="#FFFFFF" opacity="0.95"/>
+    <!-- Roof accent -->
+    <polygon points="30,-15 0,5 60,5" fill="#FFFFFF" opacity="0.9"/>
+    <!-- Minimalist door -->
+    <rect x="20" y="40" width="20" height="40" rx="4" fill="url(#modernGrad2)"/>
+  </g>
+  
+  <!-- Connection curve - smooth, modern -->
+  <path d="M 240 240 Q 256 220 272 240" 
+        stroke="#FFFFFF" 
+        stroke-width="8" 
+        fill="none" 
+        stroke-linecap="round"
+        opacity="0.9"/>
+  <circle cx="240" cy="240" r="6" fill="#FFFFFF" opacity="0.9"/>
+  <circle cx="272" cy="240" r="6" fill="#FFFFFF" opacity="0.9"/>
+  
+  <!-- Right shape - Teacher (simplified person with book) -->
+  <g transform="translate(272, 200)">
+    <!-- Head -->
+    <circle cx="30" cy="15" r="18" fill="#FFFFFF" opacity="0.95"/>
+    <!-- Body -->
+    <rect x="15" y="33" width="30" height="50" rx="15" fill="#FFFFFF" opacity="0.95"/>
+    <!-- Book (minimalist) -->
+    <rect x="18" y="45" width="24" height="18" rx="2" fill="url(#modernGrad2)"/>
+    <line x1="30" y1="45" x2="30" y2="63" stroke="#FFFFFF" stroke-width="2"/>
+  </g>
+</svg>
+

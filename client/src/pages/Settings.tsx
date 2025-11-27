@@ -10,12 +10,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Bell, Shield, User } from 'lucide-react';
+import { AuthenticatedLayout } from '@/components/AuthenticatedLayout';
+import { Loader2, Mail, Bell, Shield, User, Camera, Trash2, Key, FileText } from 'lucide-react';
 
 interface EmailPreferences {
   id: string;
@@ -38,6 +43,26 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [emailPreferences, setEmailPreferences] = useState<EmailPreferences | null>(null);
+  
+  // Profile settings
+  const [profileData, setProfileData] = useState({
+    fullName: user?.user_metadata?.full_name || '',
+    email: user?.email || '',
+  });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  
+  // Password change
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  
+  // Account deletion
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
 
   // Get initial tab from URL
   const searchParams = new URLSearchParams(window.location.search);
@@ -51,6 +76,10 @@ export default function Settings() {
     }
 
     loadEmailPreferences();
+    setProfileData({
+      fullName: user.user_metadata?.full_name || '',
+      email: user.email || '',
+    });
   }, [user]);
 
   // Handle unsubscribe action from email link
@@ -176,14 +205,211 @@ export default function Settings() {
     );
   }
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!avatarFile || !user?.id) return;
+
+    try {
+      const fileExt = avatarFile.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(filePath, avatarFile, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-images')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl }
+      });
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: 'Avatar updated',
+        description: 'Your profile picture has been updated.',
+      });
+
+      setAvatarFile(null);
+      setAvatarPreview(null);
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload avatar.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleProfileUpdate = async () => {
+    if (!user) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: profileData.fullName }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Profile updated',
+        description: 'Your profile has been updated successfully.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Update failed',
+        description: error.message || 'Failed to update profile.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword) {
+      toast({
+        title: 'Missing fields',
+        description: 'Please fill in all password fields.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: 'Passwords do not match',
+        description: 'New password and confirmation must match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: 'Password too short',
+        description: 'Password must be at least 6 characters.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Re-authenticate with current password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: passwordData.currentPassword,
+      });
+
+      if (signInError) throw new Error('Current password is incorrect');
+
+      // Update password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+
+      if (updateError) throw updateError;
+
+      toast({
+        title: 'Password updated',
+        description: 'Your password has been changed successfully.',
+      });
+
+      setShowPasswordDialog(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Password change failed',
+        description: error.message || 'Failed to change password.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAccountDeletion = async () => {
+    if (deleteConfirm !== 'DELETE') {
+      toast({
+        title: 'Confirmation required',
+        description: 'Please type DELETE to confirm account deletion.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // Delete user account (this will cascade delete related records)
+      const { error } = await supabase.auth.admin.deleteUser(user?.id || '');
+
+      if (error) {
+        // If admin API not available, sign out and show message
+        await supabase.auth.signOut();
+        toast({
+          title: 'Account deletion requested',
+          description: 'Please contact support to complete account deletion.',
+        });
+        setLocation('/login');
+        return;
+      }
+
+      toast({
+        title: 'Account deleted',
+        description: 'Your account has been permanently deleted.',
+      });
+
+      setLocation('/login');
+    } catch (error: any) {
+      toast({
+        title: 'Deletion failed',
+        description: error.message || 'Failed to delete account. Please contact support.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-          <p className="text-muted-foreground">Manage your account preferences and notifications</p>
+    <AuthenticatedLayout>
+      <div className="px-4 md:px-8 py-8 md:py-12 max-w-4xl mx-auto">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2">Settings</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your account preferences and notifications</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -424,25 +650,168 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* Account Tab (Placeholder) */}
-          <TabsContent value="account">
+          {/* Account Tab */}
+          <TabsContent value="account" className="space-y-6">
+            {/* Profile Settings */}
             <Card>
               <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
+                <CardTitle>Profile Settings</CardTitle>
                 <CardDescription>
-                  Manage your account information
+                  Update your profile information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Avatar Upload */}
+                <div className="space-y-4">
+                  <Label>Profile Picture</Label>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={avatarPreview || user?.user_metadata?.avatar_url} />
+                      <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
+                        {getInitials(profileData.fullName || user?.email || 'U')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        className="h-11"
+                      />
+                      {avatarFile && (
+                        <Button
+                          size="sm"
+                          onClick={handleAvatarUpload}
+                          disabled={saving}
+                          className="gap-2"
+                        >
+                          <Camera className="h-4 w-4" />
+                          Upload
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    value={profileData.fullName}
+                    onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                    className="h-11"
+                  />
+                </div>
+
+                {/* Email (Read-only) */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    value={profileData.email}
+                    disabled
+                    className="h-11 bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Email cannot be changed. Contact support if you need to update it.
+                  </p>
+                </div>
+
+                <Button onClick={handleProfileUpdate} disabled={saving} className="w-full sm:w-auto">
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Profile'
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Password Change */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Change Password</CardTitle>
+                <CardDescription>
+                  Update your account password
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">
-                  Account settings coming soon.
-                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowPasswordDialog(true)}
+                  className="gap-2 w-full sm:w-auto"
+                >
+                  <Key className="h-4 w-4" />
+                  Change Password
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Account Deletion */}
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                <CardDescription>
+                  Permanently delete your account
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="gap-2 w-full sm:w-auto">
+                      <Trash2 className="h-4 w-4" />
+                      Delete Account
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your account
+                        and remove all your data from our servers.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-4 py-4">
+                      <Label htmlFor="delete-confirm">
+                        Type <strong>DELETE</strong> to confirm:
+                      </Label>
+                      <Input
+                        id="delete-confirm"
+                        value={deleteConfirm}
+                        onChange={(e) => setDeleteConfirm(e.target.value)}
+                        placeholder="DELETE"
+                        className="h-11"
+                      />
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleAccountDeletion}
+                        disabled={deleteConfirm !== 'DELETE' || saving}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          'Delete Account'
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Privacy Tab (Placeholder) */}
-          <TabsContent value="privacy">
+          {/* Privacy Tab */}
+          <TabsContent value="privacy" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Privacy Settings</CardTitle>
@@ -450,16 +819,106 @@ export default function Settings() {
                   Manage your privacy and data preferences
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  Privacy settings coming soon.
-                </p>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">Profile Visibility</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Allow schools/teachers to view your profile
+                    </p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">Show Contact Information</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Display your contact information on your profile
+                    </p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+
+                <div className="p-4 border rounded-lg bg-muted/50">
+                  <h3 className="font-semibold mb-2">Data & Privacy</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    We respect your privacy. Your data is encrypted and stored securely.
+                    You can request a copy of your data or delete your account at any time.
+                  </p>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    Download My Data
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+
+      {/* Password Change Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your current password and choose a new one
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                className="h-11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Must be at least 6 characters long
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                className="h-11"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handlePasswordChange} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Changing...
+                </>
+              ) : (
+                'Change Password'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AuthenticatedLayout>
   );
 }
 

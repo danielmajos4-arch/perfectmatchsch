@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,12 +19,16 @@ const GRADE_LEVELS = [
 ];
 
 const YEARS_EXPERIENCE_OPTIONS = [
-  { value: '0-1', label: '0-1 years' },
+  { value: '1', label: '1 year' },
   { value: '2-5', label: '2-5 years' },
   { value: '6-10', label: '6-10 years' },
   { value: '11-15', label: '11-15 years' },
   { value: '16+', label: '16+ years' },
 ];
+
+const MIN_BIO_LENGTH = 50;
+const MIN_BIO_MAX = 500;
+const MIN_PHILOSOPHY_LENGTH = 30;
 
 interface TeacherProfileData {
   full_name: string;
@@ -42,7 +46,7 @@ interface TeacherProfileStepProps {
   initialData?: Partial<TeacherProfileData>;
 }
 
-export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepProps) {
+export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepProps) {
   const [formData, setFormData] = useState<TeacherProfileData>({
     full_name: initialData?.full_name || '',
     phone: initialData?.phone || '',
@@ -55,51 +59,184 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const previousInitialDataRef = useRef<Partial<TeacherProfileData> | undefined>(initialData);
 
-  const toggleSubject = (subject: string) => {
+  useEffect(() => {
+    if (!initialData) return;
+
+    const prevInitialData = previousInitialDataRef.current;
+    
+    // Deep comparison to prevent unnecessary updates
+    const hasMeaningfulChange =
+      !prevInitialData ||
+      Object.entries(initialData).some(([key, value]) => {
+        const typedKey = key as keyof TeacherProfileData;
+        const prevValue = prevInitialData[typedKey];
+        
+        // Handle array comparison
+        if (Array.isArray(value) && Array.isArray(prevValue)) {
+          if (value.length !== prevValue.length) return true;
+          return value.some((v, i) => v !== prevValue[i]);
+        }
+        
+        return value !== prevValue;
+      });
+
+    if (!hasMeaningfulChange) {
+      return;
+    }
+
+    setFormData((prev) => {
+      // Only update if there are actual changes
+      const hasChanges = Object.entries(initialData).some(([key, value]) => {
+        const typedKey = key as keyof TeacherProfileData;
+        const prevValue = prev[typedKey];
+        
+        if (Array.isArray(value) && Array.isArray(prevValue)) {
+          if (value.length !== prevValue.length) return true;
+          return value.some((v, i) => v !== prevValue[i]);
+        }
+        
+        return value !== prevValue;
+      });
+      
+      if (!hasChanges) {
+        return prev; // Return same reference to prevent re-render
+      }
+      
+      return {
+        ...prev,
+        ...initialData,
+      };
+    });
+
+    previousInitialDataRef.current = initialData;
+  }, [initialData]);
+
+  const toggleSubject = useCallback((subject: string) => {
     setFormData(prev => ({
       ...prev,
       subjects: prev.subjects.includes(subject)
         ? prev.subjects.filter(s => s !== subject)
-        : [...prev.subjects, subject]
+        : [...prev.subjects, subject],
     }));
-  };
+  }, []);
 
-  const toggleGradeLevel = (level: string) => {
+  const toggleGradeLevel = useCallback((level: string) => {
     setFormData(prev => ({
       ...prev,
       grade_levels: prev.grade_levels.includes(level)
         ? prev.grade_levels.filter(l => l !== level)
-        : [...prev.grade_levels, level]
+        : [...prev.grade_levels, level],
     }));
-  };
+  }, []);
 
-  const validateForm = (): boolean => {
+  const handleYearsExperienceChange = useCallback((value: string) => {
+    // Prevent unnecessary updates if value hasn't changed
+    setFormData(prev => {
+      const currentValue = prev.years_experience || '';
+      if (currentValue === value) {
+        return prev; // Return same reference if unchanged to prevent re-render
+      }
+      return {
+        ...prev,
+        years_experience: value,
+      };
+    });
+  }, []);
+
+  const handleFullNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, full_name: e.target.value }));
+  }, []);
+
+  const handlePhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, phone: e.target.value }));
+  }, []);
+
+  const handleLocationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, location: e.target.value }));
+  }, []);
+
+  const handleBioChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData(prev => ({ ...prev, bio: e.target.value }));
+  }, []);
+
+  const handleTeachingPhilosophyChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData(prev => ({ ...prev, teaching_philosophy: e.target.value }));
+  }, []);
+
+  const validateForm = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.full_name.trim()) newErrors.full_name = 'Full name is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
     if (!formData.location.trim()) newErrors.location = 'Location is required';
-    if (!formData.years_experience) newErrors.years_experience = 'Years of experience is required';
+    if (!formData.years_experience) {
+      newErrors.years_experience = 'Years of experience is required';
+    } else if (formData.years_experience === '0') {
+      newErrors.years_experience = 'Please enter at least 1 year of experience';
+    }
     if (formData.subjects.length === 0) newErrors.subjects = 'Please select at least one subject';
     if (formData.grade_levels.length === 0) newErrors.grade_levels = 'Please select at least one grade level';
-    if (formData.bio && (formData.bio.length < 50 || formData.bio.length > 500)) {
-      newErrors.bio = 'Bio must be between 50 and 500 characters';
+    if (!formData.bio.trim()) {
+      newErrors.bio = 'Bio is required';
+    } else if (formData.bio.length < MIN_BIO_LENGTH || formData.bio.length > MIN_BIO_MAX) {
+      newErrors.bio = `Bio must be between ${MIN_BIO_LENGTH} and ${MIN_BIO_MAX} characters`;
+    }
+    if (!formData.teaching_philosophy.trim()) {
+      newErrors.teaching_philosophy = 'Teaching philosophy is required';
+    } else if (formData.teaching_philosophy.trim().length < MIN_PHILOSOPHY_LENGTH) {
+      newErrors.teaching_philosophy = `Teaching philosophy must be at least ${MIN_PHILOSOPHY_LENGTH} characters`;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [formData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Form submission handler - memoized to prevent re-renders
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onNext(formData);
+      onNext({
+        ...formData,
+        full_name: formData.full_name.trim(),
+        phone: formData.phone.trim(),
+        location: formData.location.trim(),
+        bio: formData.bio.trim(),
+        teaching_philosophy: formData.teaching_philosophy.trim(),
+      });
     }
-  };
+  }, [formData, onNext, validateForm]);
+
+  const requiredFieldStatuses = useMemo(() => {
+    return [
+      Boolean(formData.full_name.trim()),
+      Boolean(formData.phone.trim()),
+      Boolean(formData.location.trim()),
+      Boolean(formData.years_experience && formData.years_experience !== '0'),
+      formData.subjects.length > 0,
+      formData.grade_levels.length > 0,
+      Boolean(formData.bio.trim() && formData.bio.length >= MIN_BIO_LENGTH),
+      Boolean(formData.teaching_philosophy.trim() && formData.teaching_philosophy.trim().length >= MIN_PHILOSOPHY_LENGTH),
+    ];
+  }, [formData]);
+
+  const completedRequiredFields = requiredFieldStatuses.filter(Boolean).length;
+  const totalRequiredFields = requiredFieldStatuses.length;
+  const isFormComplete = completedRequiredFields === totalRequiredFields;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex items-center justify-between rounded-lg bg-muted/40 px-4 py-3">
+        <p className="text-sm font-medium text-foreground">
+          Required fields complete: {completedRequiredFields} / {totalRequiredFields}
+        </p>
+        {!isFormComplete && (
+          <p className="text-xs text-muted-foreground">
+            Finish all required fields to continue
+          </p>
+        )}
+      </div>
       <div className="space-y-4">
         <div>
           <Label htmlFor="full_name" data-testid="label-full-name">
@@ -109,7 +246,7 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
             id="full_name"
             data-testid="input-full-name"
             value={formData.full_name}
-            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+            onChange={handleFullNameChange}
             placeholder="Enter your full name"
             className={errors.full_name ? 'border-destructive' : ''}
           />
@@ -127,7 +264,7 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
             data-testid="input-phone"
             type="tel"
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={handlePhoneChange}
             placeholder="(555) 123-4567"
             className={errors.phone ? 'border-destructive' : ''}
           />
@@ -144,7 +281,7 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
             id="location"
             data-testid="input-location"
             value={formData.location}
-            onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            onChange={handleLocationChange}
             placeholder="City, State"
             className={errors.location ? 'border-destructive' : ''}
           />
@@ -158,8 +295,8 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
             Years of Experience <span className="text-destructive">*</span>
           </Label>
           <Select
-            value={formData.years_experience}
-            onValueChange={(value) => setFormData({ ...formData, years_experience: value })}
+            value={formData.years_experience || ''}
+            onValueChange={handleYearsExperienceChange}
           >
             <SelectTrigger data-testid="select-years-experience" className={errors.years_experience ? 'border-destructive' : ''}>
               <SelectValue placeholder="Select years of experience" />
@@ -235,13 +372,13 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
 
         <div>
           <Label htmlFor="bio" data-testid="label-bio">
-            Bio <span className="text-muted-foreground text-sm">(Optional, 50-500 characters)</span>
+            Bio <span className="text-destructive">*</span>
           </Label>
           <Textarea
             id="bio"
             data-testid="textarea-bio"
             value={formData.bio}
-            onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+            onChange={handleBioChange}
             placeholder="Tell us about yourself and your teaching experience..."
             rows={4}
             className={errors.bio ? 'border-destructive' : ''}
@@ -251,7 +388,7 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
               <p className="text-sm text-destructive" data-testid="error-bio">{errors.bio}</p>
             ) : (
               <p className="text-sm text-muted-foreground" data-testid="text-bio-count">
-                {formData.bio.length} / 500 characters
+                {formData.bio.length} / {MIN_BIO_MAX} characters
               </p>
             )}
           </div>
@@ -259,24 +396,84 @@ export function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepPr
 
         <div>
           <Label htmlFor="teaching_philosophy" data-testid="label-teaching-philosophy">
-            Teaching Philosophy <span className="text-muted-foreground text-sm">(Optional)</span>
+            Teaching Philosophy <span className="text-destructive">*</span>
           </Label>
           <Textarea
             id="teaching_philosophy"
             data-testid="textarea-teaching-philosophy"
             value={formData.teaching_philosophy}
-            onChange={(e) => setFormData({ ...formData, teaching_philosophy: e.target.value })}
+            onChange={handleTeachingPhilosophyChange}
             placeholder="Describe your teaching philosophy and approach..."
             rows={3}
           />
+          {errors.teaching_philosophy ? (
+            <p className="text-sm text-destructive mt-1" data-testid="error-teaching-philosophy">
+              {errors.teaching_philosophy}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-1">
+              {formData.teaching_philosophy.length} characters
+            </p>
+          )}
         </div>
       </div>
 
+      {!isFormComplete && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Please complete all required fields before continuing to the archetype quiz.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex justify-end">
-        <Button type="submit" size="lg" data-testid="button-next-profile">
+        <Button type="submit" size="lg" data-testid="button-next-profile" disabled={!isFormComplete}>
           Continue to Quiz
         </Button>
       </div>
     </form>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  // Only re-render if onNext function reference changes or initialData actually changes
+  if (prevProps.onNext !== nextProps.onNext) {
+    return false; // Re-render if onNext changes
+  }
+  
+  // Deep comparison of initialData
+  if (prevProps.initialData === nextProps.initialData) {
+    return true; // Skip re-render if same reference
+  }
+  
+  if (!prevProps.initialData && !nextProps.initialData) {
+    return true; // Skip re-render if both are undefined
+  }
+  
+  if (!prevProps.initialData || !nextProps.initialData) {
+    return false; // Re-render if one is undefined and other isn't
+  }
+  
+  // Deep comparison of all fields
+  const prev = prevProps.initialData;
+  const next = nextProps.initialData;
+  
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  for (const key of keys) {
+    const prevValue = prev[key as keyof typeof prev];
+    const nextValue = next[key as keyof typeof next];
+    
+    if (Array.isArray(prevValue) && Array.isArray(nextValue)) {
+      if (prevValue.length !== nextValue.length) {
+        return false; // Re-render if array lengths differ
+      }
+      if (prevValue.some((v, i) => v !== nextValue[i])) {
+        return false; // Re-render if array contents differ
+      }
+    } else if (prevValue !== nextValue) {
+      return false; // Re-render if values differ
+    }
+  }
+  
+  return true; // Skip re-render if all values are the same
+});
