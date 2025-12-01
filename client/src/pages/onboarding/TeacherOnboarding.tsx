@@ -11,7 +11,7 @@ import { ArchetypeResults } from '@/components/onboarding/ArchetypeResults';
 import { supabase } from '@/lib/supabaseClient';
 import { QuizWithOptions, UserArchetype, InsertTeacher, Teacher } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
-import logoUrl from '@assets/New logo-15_1762774603259.png';
+const logoUrl = '/images/logo.png';
 import { getMissingFields, isProfileComplete, calculateProfileCompletion, TeacherProfile as CompletionProfile } from '@/lib/profileUtils';
 
 type OnboardingStep = 'profile' | 'quiz' | 'results';

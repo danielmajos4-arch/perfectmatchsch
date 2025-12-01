@@ -17,7 +17,7 @@ import { InsertSchool } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
 import { createDefaultTemplates } from '@/utils/defaultTemplates';
 import { useToast } from '@/hooks/use-toast';
-import logoUrl from '@assets/New logo-15_1762774603259.png';
+const logoUrl = '/images/logo.png';
 
 const SCHOOL_TYPES = [
   'Public',

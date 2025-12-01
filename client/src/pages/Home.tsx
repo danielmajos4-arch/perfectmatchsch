@@ -7,9 +7,10 @@ import { Briefcase, MessageCircle, Search, GraduationCap } from 'lucide-react';
 import { PromotionalBanner } from '@/components/PromotionalBanner';
 import { HeroSearch } from '@/components/HeroSearch';
 import { TrustBadges } from '@/components/TrustBadges';
-import logoUrl from '@assets/New logo-15_1762774603259.png';
-import featuresImageUrl from '@assets/image_1762775399256.png';
-import heroBackgroundImage from '@assets/image_1762775214433.png';
+// Images moved to public folder for Vercel deployment
+const logoUrl = '/images/logo.png';
+const featuresImageUrl = 'https://placehold.co/800x600/4F46E5/FFFFFF?text=PerfectMatch+Schools';
+const heroBackgroundImage = 'https://placehold.co/1920x1080/1E293B/FFFFFF?text=Find+Your+Perfect+Match';
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -37,15 +38,14 @@ export default function Home() {
         {/* Hero Section - Upwork Style with Rounded Container */}
         <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">
           <section className="relative min-h-[500px] sm:min-h-[600px] md:min-h-[700px] lg:min-h-[800px] flex items-center overflow-hidden rounded-2xl md:rounded-3xl shadow-2xl">
-            {/* Background Image with Overlay */}
-            <div className="absolute inset-0 overflow-hidden rounded-2xl md:rounded-3xl">
-              <img 
-                src={heroBackgroundImage} 
-                alt="Hero Background" 
-                className="w-full h-full object-cover object-center"
-                style={{ filter: 'brightness(0.85) contrast(1.1)' }}
-              />
-              {/* Dark overlay for text readability - lighter to show more image */}
+            {/* Background with Gradient (replacing image for deployment) */}
+            <div className="absolute inset-0 overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+              {/* Optional: Add pattern overlay for visual interest */}
+              <div className="absolute inset-0 opacity-10" style={{
+                backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
+                backgroundSize: '40px 40px'
+              }}></div>
+              {/* Dark overlay for text readability */}
               <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/50"></div>
         </div>
 

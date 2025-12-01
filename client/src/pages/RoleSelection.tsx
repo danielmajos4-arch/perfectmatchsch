@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { Building2, GraduationCap, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import logoUrl from '@assets/New logo-15_1762774603259.png';
+const logoUrl = '/images/logo.png';
 
 export default function RoleSelection() {
   const [, setLocation] = useLocation();

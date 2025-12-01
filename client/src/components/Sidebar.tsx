@@ -36,7 +36,7 @@ import {
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import logoUrl from '@assets/New logo-15_1762774603259.png';
+const logoUrl = '/images/logo.png';
 import { useQuery } from '@tanstack/react-query';
 import { calculateProfileCompletion } from '@/lib/profileUtils';
 import { Progress } from '@/components/ui/progress';
