@@ -29,6 +29,9 @@ import {
   Bell,
   Mail,
   TestTube,
+  Users,
+  LayoutDashboard,
+  Shield,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
@@ -49,7 +52,7 @@ interface NavItem {
   icon: typeof Home;
   href: string;
   badge?: number;
-  roles?: ('teacher' | 'school')[];
+  roles?: ('teacher' | 'school' | 'admin')[];
 }
 
 const SCHOOL_NAV_ITEMS: NavItem[] = [
@@ -70,14 +73,24 @@ const TEACHER_NAV_ITEMS: NavItem[] = [
   { label: 'Profile', icon: User, href: '/profile', roles: ['teacher'] },
 ];
 
+const ADMIN_NAV_ITEMS: NavItem[] = [
+  { label: 'Dashboard', icon: LayoutDashboard, href: '/admin/dashboard', roles: ['admin'] },
+  { label: 'Users', icon: Users, href: '/admin/users', roles: ['admin'] },
+  { label: 'Jobs', icon: Briefcase, href: '/admin/jobs', roles: ['admin'] },
+];
+
 export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, role } = useAuth();
   const { toast } = useToast();
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Get navigation items based on role
-  const navItems = role === 'school' ? SCHOOL_NAV_ITEMS : TEACHER_NAV_ITEMS;
+  const navItems = role === 'admin' 
+    ? ADMIN_NAV_ITEMS 
+    : role === 'school' 
+      ? SCHOOL_NAV_ITEMS 
+      : TEACHER_NAV_ITEMS;
 
   // Fetch unread notification count
   useEffect(() => {
@@ -135,20 +148,36 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
     };
   }, [user?.id]);
 
-  // Teacher profile completion (for sidebar indicator)
+  // Teacher profile completion (for sidebar indicator and avatar)
   const { data: teacherProfile } = useQuery({
-    queryKey: ['sidebar-teacher-profile', user?.id],
+    queryKey: ['/api/teacher-profile', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('teachers')
         .select('*')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
       return data;
     },
     enabled: !!user?.id && role === 'teacher',
+  });
+
+  // School profile (for logo and name)
+  const { data: schoolProfile } = useQuery({
+    queryKey: ['/api/school-profile', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('schools')
+        .select('logo_url, school_name')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+    enabled: !!user?.id && role === 'school',
   });
 
   const completionPercentage =
@@ -160,6 +189,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
       title: 'Logged out',
       description: 'You have been successfully logged out.',
     });
+    setLocation('/login');
   };
 
   const getInitials = (name: string) => {
@@ -222,7 +252,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
-          <Link href={role === 'school' ? '/school/dashboard' : '/teacher/dashboard'}>
+          <Link href={role === 'admin' ? '/admin/dashboard' : role === 'school' ? '/school/dashboard' : '/teacher/dashboard'}>
             <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <img 
                 src={logoUrl} 
@@ -255,14 +285,32 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
           <div className="p-4 border-b border-border">
             <Link href="/profile" className="flex items-center gap-3 group">
               <Avatar className="h-10 w-10 group-hover:scale-105 transition-transform">
-                <AvatarImage src={user.user_metadata?.avatar_url} />
+                <AvatarImage 
+                  src={
+                    role === 'teacher' && teacherProfile?.profile_photo_url
+                      ? teacherProfile.profile_photo_url
+                      : role === 'school' && schoolProfile?.logo_url
+                      ? schoolProfile.logo_url
+                      : undefined
+                  } 
+                />
                 <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                  {getInitials(user.user_metadata?.full_name || user.email || 'U')}
+                  {getInitials(
+                    role === 'teacher' && teacherProfile?.full_name
+                      ? teacherProfile.full_name
+                      : role === 'school' && schoolProfile?.school_name
+                      ? schoolProfile.school_name
+                      : user.user_metadata?.full_name || user.email || 'U'
+                  )}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0 hidden lg:block">
                 <p className="text-sm font-medium text-foreground truncate">
-                  {user.user_metadata?.full_name || 'User'}
+                  {role === 'teacher' && teacherProfile?.full_name
+                    ? teacherProfile.full_name
+                    : role === 'school' && schoolProfile?.school_name
+                    ? schoolProfile.school_name
+                    : user.user_metadata?.full_name || 'User'}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {user.email}

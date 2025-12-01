@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { QuizWithOptions, UserArchetype, InsertTeacher, Teacher } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
 import logoUrl from '@assets/New logo-15_1762774603259.png';
-import { getMissingFields, isProfileComplete, TeacherProfile as CompletionProfile } from '@/lib/profileUtils';
+import { getMissingFields, isProfileComplete, calculateProfileCompletion, TeacherProfile as CompletionProfile } from '@/lib/profileUtils';
 
 type OnboardingStep = 'profile' | 'quiz' | 'results';
 
@@ -51,6 +51,16 @@ export default function TeacherOnboarding() {
   const [archetypeData, setArchetypeData] = useState<UserArchetype | null>(null);
   const [error, setError] = useState('');
   const profileInitializedRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const isTransitioningRef = useRef(false);
+
+  // Track component mount/unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const { data: teacherProfile, isLoading: teacherProfileLoading } = useQuery<Teacher | null>({
     queryKey: ['teacher-onboarding-profile', user?.id],
@@ -72,7 +82,7 @@ export default function TeacherOnboarding() {
   const shouldEnforceGuard = isTeacher && !teacherProfile?.profile_complete;
 
   useEffect(() => {
-    if (!profileInitializedRef.current && teacherProfile) {
+    if (!profileInitializedRef.current && teacherProfile && isMountedRef.current) {
       setProfileData({
         full_name: teacherProfile.full_name || user?.user_metadata?.full_name || '',
         phone: teacherProfile.phone || '',
@@ -88,8 +98,22 @@ export default function TeacherOnboarding() {
     }
   }, [teacherProfile, user]);
 
+  // Fixed: Only redirect if profile is complete AND we're not on results step AND not already transitioning
   useEffect(() => {
-    if (teacherProfile?.profile_complete && currentStep !== 'results' && location !== '/teacher/dashboard') {
+    // Don't run if component is unmounted or we're transitioning
+    if (!isMountedRef.current || isTransitioningRef.current) return;
+    
+    // Only redirect if:
+    // 1. Profile is complete
+    // 2. We're not on results step (we want to show results first)
+    // 3. We're not already on dashboard
+    // 4. We're not currently on quiz step (let quiz complete first)
+    if (
+      teacherProfile?.profile_complete && 
+      currentStep !== 'results' && 
+      currentStep !== 'quiz' &&
+      location !== '/teacher/dashboard'
+    ) {
       setLocation('/teacher/dashboard');
     }
   }, [teacherProfile?.profile_complete, currentStep, setLocation, location]);
@@ -562,31 +586,42 @@ export default function TeacherOnboarding() {
 
         if (verification.success) {
           console.log('✅ Profile verified and saved successfully!');
+          if (isMountedRef.current) {
+            setProfileData({
+              ...data,
+              certifications: data.certifications || teacherProfile?.certifications || [],
+            });
+            setCurrentStep('quiz');
+            setError('');
+          }
+        } else {
+          console.error('❌ Profile save verification failed:', verification.errors);
+          if (isMountedRef.current) {
+            setError(`Profile saved but verification failed: ${verification.errors.join(', ')}`);
+            // Still proceed to quiz, but log the issue
+            setProfileData({
+              ...data,
+              certifications: data.certifications || teacherProfile?.certifications || [],
+            });
+            setCurrentStep('quiz');
+          }
+        }
+        // Delay query invalidation to avoid triggering re-renders during transition
+        setTimeout(() => {
+          if (isMountedRef.current && user?.id) {
+            queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
+          }
+        }, 50);
+      } else {
+        // Fallback if no user
+        if (isMountedRef.current) {
           setProfileData({
             ...data,
             certifications: data.certifications || teacherProfile?.certifications || [],
           });
           setCurrentStep('quiz');
           setError('');
-        } else {
-          console.error('❌ Profile save verification failed:', verification.errors);
-          setError(`Profile saved but verification failed: ${verification.errors.join(', ')}`);
-          // Still proceed to quiz, but log the issue
-          setProfileData({
-            ...data,
-            certifications: data.certifications || teacherProfile?.certifications || [],
-          });
-          setCurrentStep('quiz');
         }
-        queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
-      } else {
-        // Fallback if no user
-      setProfileData({
-        ...data,
-        certifications: data.certifications || teacherProfile?.certifications || [],
-      });
-      setCurrentStep('quiz');
-      setError('');
       }
     },
     onError: (error: any) => {
@@ -655,94 +690,141 @@ export default function TeacherOnboarding() {
 
       console.log('4. Top archetype:', topArchetype, '→ Mapped to:', finalArchetypeName);
 
-      // Update teacher profile with quiz results
+      // Create fallback archetype helper (defined early so it's available everywhere)
+      const createFallbackArchetype = () => ({
+        id: 'fallback',
+        user_id: null,
+        archetype_name: finalArchetypeName,
+        archetype_description: `You are ${finalArchetypeName}, a unique teaching archetype determined by your quiz responses.`,
+        strengths: ['Adaptability', 'Student-focused', 'Dedicated'],
+        growth_areas: ['Continued professional development', 'Building on strengths'],
+        ideal_environments: ['Supportive school culture', 'Collaborative teams'],
+        teaching_style: 'Personalized and student-centered'
+      });
+
+      // Update teacher profile with quiz results (with AbortController timeout)
       console.log('5. Updating teacher profile with quiz results...');
-      const { error: updateError, data: updateData } = await supabase
-        .from('teachers')
-        .update({
-          quiz_result: answers,
-          archetype: finalArchetypeName,
-          profile_complete: profileIsComplete
-        })
-        .eq('user_id', user.id)
-        .select();
+      const updateController = new AbortController();
+      const updateTimeoutId = setTimeout(() => {
+        console.warn('5. Update timeout triggered after 8 seconds');
+        updateController.abort();
+      }, 8000); // 8 second timeout
 
-      console.log('5. Teacher update result:', {
-        success: !updateError,
-        error: updateError,
-        data: updateData
-      });
+      try {
+        const { error: updateError, data: updateData } = await supabase
+          .from('teachers')
+          .update({
+            quiz_result: answers,
+            archetype: finalArchetypeName,
+            profile_complete: profileIsComplete
+          })
+          .eq('user_id', user.id)
+          .select()
+          .abortSignal(updateController.signal);
 
-      if (updateError) {
-        console.error('Failed to update teacher profile:', updateError);
-        throw updateError;
+        clearTimeout(updateTimeoutId);
+
+        console.log('5b. Teacher update result:', {
+          success: !updateError,
+          error: updateError,
+          data: updateData
+        });
+
+        if (updateError) {
+          console.error('5c. Failed to update teacher profile:', updateError);
+        }
+      } catch (updateErr: any) {
+        clearTimeout(updateTimeoutId);
+        if (updateErr.name === 'AbortError') {
+          console.warn('5c. Database update aborted due to timeout - proceeding with fallback');
+        } else {
+          console.error('5c. Update error:', updateErr);
+        }
+        // Continue to fetch archetype info or use fallback
       }
 
-      // Fetch archetype information
+      // Fetch archetype information (with AbortController timeout)
       console.log('6. Fetching archetype information for:', finalArchetypeName);
-      const { data: archetypeInfo, error: fetchError } = await supabase
-        .from('user_archetypes')
-        .select('*')
-        .eq('archetype_name', finalArchetypeName)
-        .maybeSingle();
+      const fetchController = new AbortController();
+      const fetchTimeoutId = setTimeout(() => {
+        console.warn('6. Fetch timeout triggered after 5 seconds');
+        fetchController.abort();
+      }, 5000); // 5 second timeout
 
-      console.log('6. Archetype fetch result:', {
-        success: !!archetypeInfo,
-        data: archetypeInfo ? {
-          id: archetypeInfo.id,
-          archetype_name: archetypeInfo.archetype_name,
-          hasDescription: !!archetypeInfo.archetype_description,
-          strengthsCount: archetypeInfo.strengths?.length || 0
-        } : null,
-        error: fetchError
-      });
+      try {
+        const { data: archetypeInfo, error: fetchError } = await supabase
+          .from('user_archetypes')
+          .select('*')
+          .eq('archetype_name', finalArchetypeName)
+          .maybeSingle()
+          .abortSignal(fetchController.signal);
 
-      if (fetchError) {
-        console.error('Failed to fetch archetype info:', fetchError);
-        // If table doesn't exist or query fails, create a fallback response
-        console.log('6b. Creating fallback archetype info...');
-        const fallbackArchetype = {
-          id: 'fallback',
-          user_id: null,
-          archetype_name: finalArchetypeName,
-          archetype_description: `You are ${finalArchetypeName}, a unique teaching archetype determined by your quiz responses.`,
-          strengths: ['Adaptability', 'Student-focused', 'Dedicated'],
-          growth_areas: ['Continued professional development', 'Building on strengths'],
-          ideal_environments: ['Supportive school culture', 'Collaborative teams'],
-          teaching_style: 'Personalized and student-centered'
-        };
-        console.log('6b. Using fallback archetype:', fallbackArchetype);
-        console.log('=== QUIZ SUBMISSION DEBUG END: SUCCESS (with fallback) ===');
+        clearTimeout(fetchTimeoutId);
+
+        console.log('6b. Archetype fetch result:', {
+          success: !!archetypeInfo,
+          data: archetypeInfo ? {
+            id: archetypeInfo.id,
+            archetype_name: archetypeInfo.archetype_name,
+            hasDescription: !!archetypeInfo.archetype_description,
+            strengthsCount: archetypeInfo.strengths?.length || 0
+          } : null,
+          error: fetchError
+        });
+
+        if (fetchError || !archetypeInfo) {
+          console.log('6c. Using fallback archetype due to fetch error or missing data');
+          const fallbackArchetype = createFallbackArchetype();
+          console.log('=== QUIZ SUBMISSION DEBUG END: SUCCESS (with fallback) ===');
+          return fallbackArchetype;
+        }
+
+        console.log('=== QUIZ SUBMISSION DEBUG END: SUCCESS ===');
+        return archetypeInfo;
+      } catch (fetchErr: any) {
+        clearTimeout(fetchTimeoutId);
+        if (fetchErr.name === 'AbortError') {
+          console.warn('6c. Archetype fetch aborted due to timeout - using fallback');
+        } else {
+          console.error('6c. Fetch error:', fetchErr);
+        }
+        const fallbackArchetype = createFallbackArchetype();
+        console.log('=== QUIZ SUBMISSION DEBUG END: SUCCESS (with fallback due to error) ===');
         return fallbackArchetype;
       }
-
-      if (!archetypeInfo) {
-        console.warn('Archetype not found in database, using fallback');
-        const fallbackArchetype = {
-          id: 'fallback',
-          user_id: null,
-          archetype_name: finalArchetypeName,
-          archetype_description: `You are ${finalArchetypeName}, a unique teaching archetype determined by your quiz responses.`,
-          strengths: ['Adaptability', 'Student-focused', 'Dedicated'],
-          growth_areas: ['Continued professional development', 'Building on strengths'],
-          ideal_environments: ['Supportive school culture', 'Collaborative teams'],
-          teaching_style: 'Personalized and student-centered'
-        };
-        console.log('=== QUIZ SUBMISSION DEBUG END: SUCCESS (with fallback) ===');
-        return fallbackArchetype;
-      }
-
-      console.log('=== QUIZ SUBMISSION DEBUG END: SUCCESS ===');
-      return archetypeInfo;
     },
     onSuccess: (data) => {
+      console.log('7. onSuccess called with data:', data?.archetype_name);
+      
+      // Guard against updates after unmount
+      if (!isMountedRef.current) {
+        console.warn('7. Component unmounted, skipping state update');
+        return;
+      }
+      
+      // Set transitioning flag to prevent useEffect from interfering
+      isTransitioningRef.current = true;
+      
       setArchetypeData(data);
       setCurrentStep('results');
       setError('');
-      queryClient.invalidateQueries({ queryKey: ['teacher-profile'] });
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
-      }
+      
+      // Delay query invalidation to avoid triggering re-renders during transition
+      // Use setTimeout to let the state update complete first
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          queryClient.invalidateQueries({ queryKey: ['teacher-profile'] });
+          if (user?.id) {
+            queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
+          }
+          // Clear transitioning flag after a short delay
+          setTimeout(() => {
+            isTransitioningRef.current = false;
+          }, 100);
+        }
+      }, 50);
+      
+      console.log('7b. State updated - should now show results step');
     },
     onError: (error: any) => {
       console.error('Error submitting quiz:', error);
@@ -804,8 +886,19 @@ export default function TeacherOnboarding() {
   });
 
   const handleContinueToDashboard = () => {
-    if (!onboardingComplete || completeOnboardingMutation.isPending) return;
-    completeOnboardingMutation.mutate();
+    // Allow users to proceed even if profile isn't 100% complete
+    // Photo and resume can be added later from dashboard
+    if (completeOnboardingMutation.isPending) return;
+    
+    // If profile is complete, mark it as complete
+    // Otherwise, just redirect to dashboard (profile_complete stays false)
+    const payload = getCompletionPayload();
+    if (payload && isProfileComplete(payload)) {
+      completeOnboardingMutation.mutate();
+    } else {
+      // Still redirect to dashboard, but don't mark as complete
+      setLocation('/teacher/dashboard');
+    }
   };
 
   if (!user) {
@@ -824,25 +917,53 @@ export default function TeacherOnboarding() {
     );
   }
 
+  const stepProgress = {
+    profile: { step: 1, total: 3, label: 'Profile' },
+    quiz: { step: 2, total: 3, label: 'Archetype Quiz' },
+    results: { step: 3, total: 3, label: 'Results' },
+  };
+
+  const currentProgress = stepProgress[currentStep];
+  const progressPercentage = (currentProgress.step / currentProgress.total) * 100;
+
   return (
-    <div className="min-h-screen bg-background py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center mb-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 py-4 sm:py-8 px-4 sm:px-6">
+      <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8">
+        {/* Progress Indicator - Mobile Optimized */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center text-sm mb-2">
+            <span className="font-semibold text-foreground">Step {currentProgress.step} of {currentProgress.total}</span>
+            <span className="font-semibold text-primary">{Math.round(progressPercentage)}%</span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2.5 sm:h-3 overflow-hidden shadow-inner">
+            <div 
+              className="h-full bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] transition-all duration-500 ease-out rounded-full shadow-sm"
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span className={currentStep === 'profile' ? 'font-semibold text-primary' : ''}>Profile</span>
+            <span className={currentStep === 'quiz' ? 'font-semibold text-primary' : ''}>Quiz</span>
+            <span className={currentStep === 'results' ? 'font-semibold text-primary' : ''}>Results</span>
+          </div>
+        </div>
+
+        <div className="text-center space-y-3">
+          <div className="flex justify-center mb-6">
             <img 
               src={logoUrl} 
               alt="PerfectMatchSchools" 
-              className="h-24 w-auto drop-shadow-2xl" 
+              className="h-28 w-auto drop-shadow-2xl" 
               style={{ 
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
                 transform: 'scale(1.08)'
               }}
             />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent" data-testid="text-onboarding-title">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent" data-testid="text-onboarding-title">
             Welcome to PerfectMatchSchools
           </h1>
-          <p className="text-muted-foreground" data-testid="text-onboarding-subtitle">
+          <p className="text-muted-foreground text-lg" data-testid="text-onboarding-subtitle">
             {currentStep === 'profile' && "Let's create your teaching profile"}
             {currentStep === 'quiz' && "Discover your teaching archetype"}
             {currentStep === 'results' && "Your teaching archetype"}
@@ -856,20 +977,20 @@ export default function TeacherOnboarding() {
           </Alert>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle data-testid="text-step-title">
+        <Card className="shadow-medium border-border/50">
+          <CardHeader className="pb-4 sm:pb-6 px-4 sm:px-6">
+            <CardTitle className="text-xl sm:text-2xl md:text-3xl" data-testid="text-step-title">
               {currentStep === 'profile' && 'Step 1: Basic Profile'}
               {currentStep === 'quiz' && 'Step 2: Teaching Archetype Quiz'}
               {currentStep === 'results' && 'Your Teaching Archetype'}
             </CardTitle>
-            <CardDescription data-testid="text-step-description">
+            <CardDescription className="text-sm sm:text-base mt-2" data-testid="text-step-description">
               {currentStep === 'profile' && 'Tell us about your teaching background and experience'}
               {currentStep === 'quiz' && 'Answer 8 questions to discover your unique teaching style'}
               {currentStep === 'results' && 'Learn about your strengths and ideal teaching environment'}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             {currentStep === 'profile' && (
               <TeacherProfileStep
                 onNext={handleProfileSubmit}
@@ -911,28 +1032,44 @@ export default function TeacherOnboarding() {
             {currentStep === 'results' && archetypeData && (
               <>
                 {!onboardingComplete && (
-                  <Alert variant="destructive" className="mb-6">
-                    <AlertCircle className="h-4 w-4" />
+                  <Alert className="mb-6 border-primary/20 bg-primary/5">
+                    <AlertCircle className="h-4 w-4 text-primary" />
                     <AlertDescription>
-                      Complete all required profile fields before accessing the dashboard.
-                      {incompleteFields.length > 0 && (
-                        <ul className="mt-2 list-disc list-inside space-y-1 text-sm">
-                          {incompleteFields.map((field) => (
-                            <li key={field}>{field}</li>
-                          ))}
-                        </ul>
-                      )}
+                      <div className="space-y-2">
+                        <p className="font-medium text-foreground">
+                          Almost there! Your profile is {(() => {
+                            const payload = getCompletionPayload();
+                            return payload ? Math.round(calculateProfileCompletion(payload)) : 0;
+                          })()}% complete.
+                        </p>
+                        {incompleteFields.length > 0 && (
+                          <div>
+                            <p className="text-sm text-muted-foreground mb-1">Complete these fields for better matches:</p>
+                            <ul className="text-sm text-muted-foreground space-y-1">
+                              {incompleteFields.map((field) => (
+                                <li key={field} className="flex items-center gap-2">
+                                  <span className="text-primary">•</span>
+                                  <span>{field}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          You can complete your profile later from the dashboard. Photo and resume are optional.
+                        </p>
+                      </div>
                     </AlertDescription>
                   </Alert>
                 )}
                 <ArchetypeResults
                   archetype={archetypeData}
                   onContinue={handleContinueToDashboard}
-                  continueDisabled={!onboardingComplete || completeOnboardingMutation.isPending}
+                  continueDisabled={completeOnboardingMutation.isPending}
                   continueDisabledMessage={
-                    onboardingComplete
+                    completeOnboardingMutation.isPending
                       ? 'Saving your profile...'
-                      : 'Finish completing your profile before continuing.'
+                      : undefined
                   }
                 />
               </>

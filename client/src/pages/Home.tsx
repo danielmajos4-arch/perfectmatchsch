@@ -1,4 +1,5 @@
-import { Link } from 'wouter';
+import { useEffect } from 'react';
+import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Layout } from '@/components/Layout';
@@ -11,6 +12,22 @@ import featuresImageUrl from '@assets/image_1762775399256.png';
 import heroBackgroundImage from '@assets/image_1762775214433.png';
 
 export default function Home() {
+  const [, setLocation] = useLocation();
+
+  // Secret admin access: Shift + Cmd/Ctrl + A
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Shift + Cmd (Mac) or Shift + Ctrl (Windows) + A
+      if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setLocation('/admin/login');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setLocation]);
+
   return (
     <Layout>
     <div className="min-h-screen bg-background">
@@ -99,45 +116,45 @@ export default function Home() {
               />
             </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="p-6 text-center">
-              <div className="flex justify-center mb-4">
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Search className="h-6 w-6 text-primary" />
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8">
+            <Card className="p-8 text-center card-hover border-border/50 shadow-sm hover:shadow-medium transition-all duration-300">
+              <div className="flex justify-center mb-6">
+                <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-sm">
+                  <Search className="h-8 w-8 text-primary" />
                 </div>
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">
+              <h3 className="text-xl font-semibold text-foreground mb-3">
                 Find the Perfect Match
               </h3>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground leading-relaxed">
                 Browse hundreds of teaching positions tailored to your expertise and preferences
               </p>
             </Card>
 
-            <Card className="p-6 text-center">
-              <div className="flex justify-center mb-4">
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Briefcase className="h-6 w-6 text-primary" />
+            <Card className="p-8 text-center card-hover border-border/50 shadow-sm hover:shadow-medium transition-all duration-300">
+              <div className="flex justify-center mb-6">
+                <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-sm">
+                  <Briefcase className="h-8 w-8 text-primary" />
                 </div>
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">
+              <h3 className="text-xl font-semibold text-foreground mb-3">
                 Easy Applications
               </h3>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground leading-relaxed">
                 Apply to positions with just a few clicks and track your application status
               </p>
             </Card>
 
-            <Card className="p-6 text-center">
-              <div className="flex justify-center mb-4">
-                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <MessageCircle className="h-6 w-6 text-primary" />
+            <Card className="p-8 text-center card-hover border-border/50 shadow-sm hover:shadow-medium transition-all duration-300">
+              <div className="flex justify-center mb-6">
+                <div className="h-16 w-16 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-sm">
+                  <MessageCircle className="h-8 w-8 text-primary" />
                 </div>
               </div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">
+              <h3 className="text-xl font-semibold text-foreground mb-3">
                 Direct Communication
               </h3>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground leading-relaxed">
                 Chat directly with schools and build meaningful connections
               </p>
             </Card>

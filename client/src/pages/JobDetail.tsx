@@ -73,8 +73,22 @@ export default function JobDetail() {
   const startConversationMutation = useMutation({
     mutationFn: async () => {
       if (!user?.id || !schoolUserId) throw new Error('Missing user information');
-      const result = await getOrCreateConversation(user.id, schoolUserId, job?.id);
-      return result.conversation;
+      
+      // Wrap getOrCreateConversation with timeout to prevent hanging
+      const convPromise = getOrCreateConversation(user.id, schoolUserId, job?.id);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Conversation creation timed out. Please try again.')), 10000);
+      });
+      
+      try {
+        const result = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
+        return result.conversation;
+      } catch (error: any) {
+        if (error.message === 'Conversation creation timed out. Please try again.') {
+          throw new Error('Starting conversation took too long. Please try again.');
+        }
+        throw error;
+      }
     },
     onSuccess: (conversation) => {
       queryClient.invalidateQueries({ queryKey: ['/api/conversations', user?.id] });

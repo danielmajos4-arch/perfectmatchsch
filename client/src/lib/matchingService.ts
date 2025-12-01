@@ -3,6 +3,7 @@
 
 import { supabase } from './supabaseClient';
 import { notifyApplicationStatusUpdate } from './notificationService';
+import { triggerApplicationStatusEmail } from './emailTriggers';
 import type { CandidateMatchView, TeacherJobMatch, Job } from '@shared/matching';
 
 /**
@@ -213,6 +214,13 @@ export async function updateCandidateStatus(
             applicationData.id,
             job.title,
             applicationStatus
+          );
+          
+          // Also trigger email notification
+          await triggerApplicationStatusEmail(
+            candidateData.teacher_id,
+            candidateData.job_id,
+            status
           );
         }
       }

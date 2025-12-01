@@ -10,10 +10,13 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { withTimeout, getAuthErrorMessage } from '@/lib/authUtils';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Register() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [intent, setIntent] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -22,6 +25,13 @@ export default function Register() {
     fullName: '',
     role: '',
   });
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      setLocation('/dashboard');
+    }
+  }, [user, authLoading, setLocation]);
 
   // Read role from URL query parameter on mount
   useEffect(() => {
@@ -38,6 +48,12 @@ export default function Register() {
 
   // Determine if role is locked (set from URL)
   const isRoleLocked = formData.role === 'teacher' || formData.role === 'school';
+
+  // If user is authenticated, return null while redirect happens
+  // Don't show a blocking "Redirecting..." spinner that can get stuck
+  if (user) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,16 +102,21 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-            role: formData.role,
+      // Wrap signUp with timeout to prevent hanging in PWA/offline mode
+      const { data: authData, error: authError } = await withTimeout(
+        supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              full_name: formData.fullName,
+              role: formData.role,
+            },
           },
-        },
-      });
+        }),
+        10000,
+        'Account creation'
+      );
 
       // Only throw error if there's an actual backend error
       if (authError) {
@@ -138,52 +159,46 @@ export default function Register() {
         // This shouldn't happen, but handle it gracefully
         throw new Error('User creation failed. Please try again.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Always show error to user if we catch an error
       // This means the backend signup failed
-      const errorMessage = error?.message || 'Something went wrong. Please try again.';
-      
       toast({
         title: 'Registration failed',
-        description: errorMessage,
+        description: getAuthErrorMessage(error),
         variant: 'destructive',
       });
       
       // Log error for debugging
-      console.error('Registration error:', {
-        message: error?.message,
-        code: error?.code,
-        status: error?.status,
-      });
+      console.error('Registration error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-8">
-          <Link href="/" className="mb-4" data-testid="link-home">
+        <div className="flex flex-col items-center mb-10">
+          <Link href="/" className="mb-6" data-testid="link-home">
             <img 
               src={logoUrl} 
               alt="PerfectMatchSchools" 
-              className="h-28 w-auto drop-shadow-2xl" 
+              className="h-32 w-auto drop-shadow-2xl" 
               style={{ 
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
                 transform: 'scale(1.08)'
               }}
             />
           </Link>
-          <p className="text-muted-foreground text-center">
+          <p className="text-muted-foreground text-center text-base">
             Join thousands of educators and schools
           </p>
         </div>
 
-        <Card className="p-8">
-          <CardHeader className="space-y-1 p-0 mb-6">
-            <CardTitle className="text-2xl font-semibold">Create an account</CardTitle>
-            <CardDescription>Enter your information to get started</CardDescription>
+        <Card className="p-8 shadow-medium border-border/50">
+          <CardHeader className="space-y-2 p-0 mb-8">
+            <CardTitle className="text-3xl font-bold">Create an account</CardTitle>
+            <CardDescription className="text-base">Enter your information to get started</CardDescription>
           </CardHeader>
 
           <CardContent className="p-0">

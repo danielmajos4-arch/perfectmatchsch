@@ -2,8 +2,9 @@ import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Briefcase, MessageCircle, FileText, TrendingUp, Sparkles } from 'lucide-react';
-import type { Teacher, Job } from '@shared/schema';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ArrowRight, Briefcase, MessageCircle, FileText, TrendingUp, Sparkles, AlertCircle } from 'lucide-react';
+import type { Teacher } from '@shared/schema';
 
 interface NextStepsWidgetProps {
   teacher: Teacher;
@@ -22,11 +23,14 @@ export function NextStepsWidget({
     {
       id: 'jobs',
       label: 'Explore Matched Jobs',
-      description: `${matchedJobsCount} new job${matchedJobsCount !== 1 ? 's' : ''} matched to your archetype`,
+      description: matchedJobsCount > 0 
+        ? `${matchedJobsCount} new job${matchedJobsCount !== 1 ? 's' : ''} matched to your archetype`
+        : 'No new matches yet',
       icon: Briefcase,
-      link: '/dashboard',
-      action: 'View Jobs',
+      link: '/dashboard#matches',
+      action: 'View',
       priority: matchedJobsCount > 0 ? 'high' : 'normal',
+      hasNotification: matchedJobsCount > 0,
     },
     {
       id: 'messages',
@@ -36,17 +40,21 @@ export function NextStepsWidget({
         : 'No new messages',
       icon: MessageCircle,
       link: '/messages',
-      action: 'Open Messages',
+      action: 'Open',
       priority: unreadMessagesCount > 0 ? 'high' : 'normal',
+      hasNotification: unreadMessagesCount > 0,
     },
     {
       id: 'applications',
       label: 'Track Applications',
-      description: `${recentApplicationsCount} active application${recentApplicationsCount !== 1 ? 's' : ''}`,
+      description: recentApplicationsCount > 0
+        ? `${recentApplicationsCount} active application${recentApplicationsCount !== 1 ? 's' : ''}`
+        : 'No active applications',
       icon: FileText,
-      link: '/dashboard',
-      action: 'View Applications',
+      link: '/dashboard#applications',
+      action: 'View',
       priority: recentApplicationsCount > 0 ? 'normal' : 'low',
+      hasNotification: false,
     },
     {
       id: 'profile',
@@ -56,76 +64,146 @@ export function NextStepsWidget({
         : 'Finish your profile to get better matches',
       icon: TrendingUp,
       link: '/profile',
-      action: teacher.profile_complete ? 'Update Profile' : 'Complete Profile',
+      action: teacher.profile_complete ? 'Update' : 'Complete',
       priority: !teacher.profile_complete ? 'high' : 'low',
+      hasNotification: !teacher.profile_complete,
     },
   ];
 
-  const highPrioritySteps = steps.filter(s => s.priority === 'high');
-  const normalSteps = steps.filter(s => s.priority === 'normal');
+  // Sort by priority: high -> normal -> low
+  const sortedSteps = [...steps].sort((a, b) => {
+    const priorityOrder = { high: 0, normal: 1, low: 2 };
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  });
+
+  const highPrioritySteps = sortedSteps.filter(s => s.priority === 'high');
+  const otherSteps = sortedSteps.filter(s => s.priority !== 'high');
 
   return (
-    <Card className="p-6">
-      <CardHeader className="pb-4">
-        <div className="flex items-center gap-2">
+    <Card className="overflow-hidden border-border/50 shadow-sm">
+      <CardHeader className="pb-4 border-b">
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
-          <CardTitle className="text-xl">Your Next Steps</CardTitle>
-        </div>
+          Your Next Steps
+        </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="pt-6">
         {highPrioritySteps.length > 0 && (
-          <>
-            {highPrioritySteps.map((step) => {
-              const Icon = step.icon;
-              return (
-                <Link key={step.id} href={step.link}>
-                  <div className="p-4 border border-primary/20 rounded-lg hover-elevate bg-primary/5 cursor-pointer transition-all">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                          <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-foreground mb-1 break-words">{step.label}</h4>
-                          <p className="text-sm text-muted-foreground break-words">{step.description}</p>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="sm" className="gap-1 flex-shrink-0 whitespace-nowrap">
-                        {step.action}
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </>
+          <div className="mb-6">
+            <div className="mb-3 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-primary" />
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Priority Actions
+              </span>
+            </div>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableBody>
+                  {highPrioritySteps.map((step) => {
+                    const Icon = step.icon;
+                    const row = (
+                      <TableRow 
+                        key={step.id}
+                        className="hover:bg-primary/5 cursor-pointer border-b last:border-b-0"
+                      >
+                        <TableCell className="w-12">
+                          <div className="p-1.5 rounded-md bg-primary/10">
+                            <Icon className="h-4 w-4 text-primary" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium text-foreground">
+                                {step.label}
+                              </span>
+                              {step.hasNotification && (
+                                <Badge variant="destructive" className="h-4 px-1.5 text-xs rounded-full">
+                                  New
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {step.description}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-20 text-right">
+                          <Link href={step.link}>
+                            <Button variant="ghost" size="sm" className="h-8 gap-1">
+                              {step.action}
+                              <ArrowRight className="h-3 w-3" />
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                    
+                    return (
+                      <Link key={step.id} href={step.link} className="contents">
+                        {row}
+                      </Link>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         )}
-        {normalSteps.length > 0 && (
-          <div className="pt-2 space-y-2">
-            {normalSteps.map((step) => {
-              const Icon = step.icon;
-              return (
-                <Link key={step.id} href={step.link}>
-                  <div className="p-3 border border-border rounded-lg hover-elevate cursor-pointer transition-all">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="text-sm font-medium text-foreground mb-1 break-words">{step.label}</h4>
-                          <p className="text-xs text-muted-foreground break-words">{step.description}</p>
-                        </div>
-                      </div>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+
+        {otherSteps.length > 0 && (
+          <div>
+            <div className="mb-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Other Actions
+              </span>
+            </div>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableBody>
+                  {otherSteps.map((step) => {
+                    const Icon = step.icon;
+                    const row = (
+                      <TableRow 
+                        key={step.id}
+                        className="hover:bg-muted/50 cursor-pointer border-b last:border-b-0"
+                      >
+                        <TableCell className="w-12">
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="text-sm font-medium text-foreground mb-0.5">
+                              {step.label}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {step.description}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-20 text-right">
+                          <Link href={step.link}>
+                            <Button variant="ghost" size="sm" className="h-8 gap-1">
+                              {step.action}
+                              <ArrowRight className="h-3 w-3" />
+                            </Button>
+                          </Link>
+                        </TableCell>
+                      </TableRow>
+                    );
+                    
+                    return (
+                      <Link key={step.id} href={step.link} className="contents">
+                        {row}
+                      </Link>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </CardContent>
     </Card>
   );
 }
-

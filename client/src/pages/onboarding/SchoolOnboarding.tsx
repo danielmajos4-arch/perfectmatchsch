@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
@@ -9,11 +9,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AlertCircle, Camera, Loader2, Building2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { uploadProfileImage } from '@/lib/storageService';
 import { InsertSchool } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
 import { createDefaultTemplates } from '@/utils/defaultTemplates';
+import { useToast } from '@/hooks/use-toast';
 import logoUrl from '@assets/New logo-15_1762774603259.png';
 
 const SCHOOL_TYPES = [
@@ -29,12 +32,16 @@ const SCHOOL_TYPES = [
 export default function SchoolOnboarding() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [formData, setFormData] = useState({
     school_name: '',
     school_type: '',
     location: '',
     description: '',
     website: '',
+    logo_url: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -49,6 +56,7 @@ export default function SchoolOnboarding() {
         location: data.location,
         description: data.description,
         website: data.website || null,
+        logo_url: data.logo_url || null,
         profile_complete: true,
       };
 
@@ -84,7 +92,9 @@ export default function SchoolOnboarding() {
       return schoolData;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['school-profile'] });
+      if (user?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/school-profile', user.id] });
+      }
       setLocation('/school/dashboard');
     },
     onError: (error: any) => {
@@ -110,6 +120,43 @@ export default function SchoolOnboarding() {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploadingLogo(true);
+    try {
+      const result = await uploadProfileImage(user.id, file);
+      
+      if (result.error) {
+        toast({
+          title: 'Upload failed',
+          description: result.error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setFormData(prev => ({ ...prev, logo_url: result.url }));
+      toast({
+        title: 'Logo uploaded',
+        description: 'Your school logo has been uploaded successfully.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error.message || 'Failed to upload logo',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingLogo(false);
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -163,6 +210,44 @@ export default function SchoolOnboarding() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* School Logo Upload */}
+              <div className="flex flex-col items-center gap-4 pb-4 border-b">
+                <Label className="text-base font-medium">
+                  School Logo <span className="text-muted-foreground text-sm font-normal">(Optional)</span>
+                </Label>
+                <div className="relative">
+                  <Avatar className="h-28 w-28 border-2 border-dashed border-muted-foreground/30">
+                    <AvatarImage src={formData.logo_url || undefined} alt="School logo" />
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      <Building2 className="h-12 w-12" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                    className="absolute bottom-0 right-0 p-2.5 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    title="Upload school logo"
+                  >
+                    {isUploadingLogo ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground text-center">
+                  Upload your school's logo (JPEG, PNG, or WebP, max 5MB)
+                </p>
+              </div>
+
               <div>
                 <Label htmlFor="school_name" data-testid="label-school-name">
                   School Name <span className="text-destructive">*</span>

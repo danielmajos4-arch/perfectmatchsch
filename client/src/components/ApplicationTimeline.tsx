@@ -130,12 +130,17 @@ export function ApplicationTimeline({ application }: ApplicationTimelineProps) {
       // Get school user_id from job
       const schoolUserId = application.job.school_id;
 
-      // Get or create conversation
-      const { conversation } = await getOrCreateConversation(
+      // Get or create conversation (with timeout)
+      const convPromise = getOrCreateConversation(
         user.id, // teacher_id
         schoolUserId, // school_id
         application.job.id // job_id
       );
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Conversation creation timed out. Please try again.')), 10000);
+      });
+      
+      const { conversation } = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
 
       // Navigate to messages with conversation ID
       navigate(`/messages?conversation=${conversation.id}`);

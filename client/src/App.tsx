@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RoleProtectedRoute } from "@/components/RoleProtectedRoute";
+import { AdminProtectedRoute } from "@/components/AdminProtectedRoute";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -23,13 +24,19 @@ import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
 import EmailTemplates from "@/pages/EmailTemplates";
 import EmailTestingDashboard from "@/pages/EmailTestingDashboard";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminJobs from "@/pages/admin/AdminJobs";
+import AdminLogin from "@/pages/admin/AdminLogin";
 import NotFound from "@/pages/not-found";
 import { ServiceWorkerUpdate, OfflineIndicator } from "@/components/ServiceWorkerUpdate";
+import { PWAInstallPrompt, IOSInstallInstructions } from "@/components/PWAInstallPrompt";
 import { PWATestPanel } from "@/components/PWATestPanel";
 import { EmailTestPanel } from "@/components/EmailTestPanel";
 import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
 import { OnboardingRequired } from "@/components/OnboardingRequired";
 import { OnboardingWatcher } from "@/components/OnboardingWatcher";
+import { EmailTriggerInitializer } from "@/components/EmailTriggerInitializer";
 // Import debug utilities to make them available globally
 import "@/utils/debugDatabase";
 import "@/utils/verifyProfileSave";
@@ -58,6 +65,24 @@ function Router() {
         <RoleProtectedRoute allowedRole="school">
           <SchoolDashboard />
         </RoleProtectedRoute>
+      </Route>
+      
+      {/* Admin routes */}
+      <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin/dashboard">
+        <AdminProtectedRoute>
+          <AdminDashboard />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/users">
+        <AdminProtectedRoute>
+          <AdminUsers />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/jobs">
+        <AdminProtectedRoute>
+          <AdminJobs />
+        </AdminProtectedRoute>
       </Route>
       
       {/* Generic dashboard route - redirects to role-specific dashboard */}
@@ -122,12 +147,16 @@ function App() {
         <TooltipProvider>
           <OnboardingWatcher />
           <ProfileCompletionBanner />
+          <EmailTriggerInitializer />
           <Toaster />
           <Router />
           {/* Service Worker Update Prompt */}
           <ServiceWorkerUpdate />
           {/* Offline Indicator */}
           <OfflineIndicator />
+          {/* PWA Install Prompt */}
+          <PWAInstallPrompt />
+          <IOSInstallInstructions />
           {/* PWA Test Panel (Development Only) */}
           <PWATestPanel />
           {/* Email Test Panel (Development Only) */}

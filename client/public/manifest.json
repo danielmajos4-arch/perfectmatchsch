@@ -1,11 +1,11 @@
 {
   "name": "PerfectMatchSchools",
   "short_name": "PerfectMatch",
-  "description": "Connect passionate educators with outstanding schools",
+  "description": "The intelligent platform connecting teachers with schools through archetype-based matching",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#6366F1",
+  "theme_color": "#C41E68",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",

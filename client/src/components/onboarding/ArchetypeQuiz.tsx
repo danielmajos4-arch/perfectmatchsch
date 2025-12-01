@@ -135,16 +135,16 @@ export function ArchetypeQuiz({ quizData, onComplete, onBack, loading }: Archety
                 }`}
                 onClick={() => handleAnswerSelect(option.id)}
               >
-                <CardContent className="flex items-start space-x-3 p-4">
+                <CardContent className="flex items-start space-x-3 p-4 sm:p-5">
                   <RadioGroupItem
                     value={option.id}
                           id={`${option.id}-${index}`}
                     data-testid={`radio-option-${index + 1}`}
-                          className="mt-0.5 flex-shrink-0"
+                          className="mt-0.5 flex-shrink-0 h-5 w-5"
                   />
                   <Label
                           htmlFor={`${option.id}-${index}`}
-                          className="flex-1 cursor-pointer font-normal text-base leading-relaxed"
+                          className="flex-1 cursor-pointer font-normal text-sm sm:text-base leading-relaxed py-1"
                   >
                     {option.text}
                   </Label>
@@ -171,15 +171,17 @@ export function ArchetypeQuiz({ quizData, onComplete, onBack, loading }: Archety
         </CardContent>
       </Card>
 
-      <div className="flex justify-between gap-4">
+      <div className="flex flex-col sm:flex-row justify-between gap-3 sm:gap-4">
         <Button
           type="button"
           variant="outline"
           onClick={handlePrevious}
           data-testid="button-previous"
+          className="w-full sm:w-auto min-h-12"
         >
           <ChevronLeft className="h-4 w-4 mr-2" />
-          {currentQuestionIndex === 0 ? 'Back to Profile' : 'Previous'}
+          <span className="hidden sm:inline">{currentQuestionIndex === 0 ? 'Back to Profile' : 'Previous'}</span>
+          <span className="sm:hidden">{currentQuestionIndex === 0 ? 'Back' : 'Prev'}</span>
         </Button>
 
         <Button
@@ -187,6 +189,7 @@ export function ArchetypeQuiz({ quizData, onComplete, onBack, loading }: Archety
           onClick={handleNext}
           disabled={!canGoNext || loading}
           data-testid="button-next-quiz"
+          className="w-full sm:w-auto min-h-12"
         >
           {loading ? (
             <>

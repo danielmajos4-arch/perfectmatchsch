@@ -227,7 +227,7 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="flex items-center justify-between rounded-lg bg-muted/40 px-4 py-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 rounded-lg bg-muted/40 px-4 py-3">
         <p className="text-sm font-medium text-foreground">
           Required fields complete: {completedRequiredFields} / {totalRequiredFields}
         </p>
@@ -320,16 +320,17 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
           </Label>
           <Card className={errors.subjects ? 'border-destructive' : ''}>
             <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {SUBJECTS.map((subject) => (
-                  <div key={subject} className="flex items-center space-x-2">
+                  <div key={subject} className="flex items-center space-x-2 min-h-[44px]">
                     <Checkbox
                       id={`subject-${subject}`}
                       data-testid={`checkbox-subject-${subject.toLowerCase()}`}
                       checked={formData.subjects.includes(subject)}
                       onCheckedChange={() => toggleSubject(subject)}
+                      className="h-5 w-5"
                     />
-                    <Label htmlFor={`subject-${subject}`} className="cursor-pointer font-normal">
+                    <Label htmlFor={`subject-${subject}`} className="cursor-pointer font-normal text-sm sm:text-base">
                       {subject}
                     </Label>
                   </div>
@@ -348,16 +349,17 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
           </Label>
           <Card className={errors.grade_levels ? 'border-destructive' : ''}>
             <CardContent className="pt-4">
-              <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {GRADE_LEVELS.map((level) => (
-                  <div key={level} className="flex items-center space-x-2">
+                  <div key={level} className="flex items-center space-x-2 min-h-[44px]">
                     <Checkbox
                       id={`grade-${level}`}
                       data-testid={`checkbox-grade-${level.toLowerCase()}`}
                       checked={formData.grade_levels.includes(level)}
                       onCheckedChange={() => toggleGradeLevel(level)}
+                      className="h-5 w-5"
                     />
-                    <Label htmlFor={`grade-${level}`} className="cursor-pointer font-normal">
+                    <Label htmlFor={`grade-${level}`} className="cursor-pointer font-normal text-sm sm:text-base">
                       {level}
                     </Label>
                   </div>
@@ -428,7 +430,7 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
       )}
 
       <div className="flex justify-end">
-        <Button type="submit" size="lg" data-testid="button-next-profile" disabled={!isFormComplete}>
+        <Button type="submit" size="lg" data-testid="button-next-profile" disabled={!isFormComplete} className="w-full sm:w-auto min-h-12">
           Continue to Quiz
         </Button>
       </div>

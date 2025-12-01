@@ -109,84 +109,186 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
-      // Check if already applied before submission
-      const { data: existing } = await supabase
-        .from('applications')
-        .select('id, status')
-        .eq('job_id', job.id)
-        .eq('teacher_id', userData.user.id)
-        .maybeSingle();
+      // Check if already applied before submission (with timeout)
+      const checkController = new AbortController();
+      const checkTimeoutId = setTimeout(() => checkController.abort(), 5000);
+      
+      let existing = null;
+      try {
+        const { data } = await supabase
+          .from('applications')
+          .select('id, status')
+          .eq('job_id', job.id)
+          .eq('teacher_id', userData.user.id)
+          .maybeSingle()
+          .abortSignal(checkController.signal);
+        existing = data;
+        clearTimeout(checkTimeoutId);
+      } catch (checkErr: any) {
+        clearTimeout(checkTimeoutId);
+        if (checkErr.name === 'AbortError') {
+          console.warn('Duplicate check timeout - proceeding with insert');
+        } else if (checkErr.code !== 'PGRST116') {
+          throw checkErr;
+        }
+      }
 
       if (existing) {
         throw new Error('DUPLICATE_APPLICATION');
       }
 
-      const { error } = await supabase.from('applications').insert({
-        job_id: job.id,
-        teacher_id: userData.user.id,
-        cover_letter: coverLetter,
-      });
-
-      if (error) {
-        // Handle duplicate key error specifically
-        if (error.code === '23505' || error.message.includes('duplicate key')) {
-          throw new Error('DUPLICATE_APPLICATION');
+      // Insert application (with timeout)
+      const insertController = new AbortController();
+      const insertTimeoutId = setTimeout(() => insertController.abort(), 8000);
+      
+      let insertError = null;
+      try {
+        const { error } = await supabase
+          .from('applications')
+          .insert({
+            job_id: job.id,
+            teacher_id: userData.user.id,
+            cover_letter: coverLetter,
+          })
+          .abortSignal(insertController.signal);
+        insertError = error;
+        clearTimeout(insertTimeoutId);
+      } catch (insertErr: any) {
+        clearTimeout(insertTimeoutId);
+        if (insertErr.name === 'AbortError') {
+          throw new Error('Application submission timed out. Please try again.');
         }
-        throw error;
+        throw insertErr;
       }
 
-      // Get application ID for notification
+      if (insertError) {
+        // Handle duplicate key error specifically
+        if (insertError.code === '23505' || insertError.message.includes('duplicate key')) {
+          throw new Error('DUPLICATE_APPLICATION');
+        }
+        throw insertError;
+      }
+
+      // Get application ID for notification (with timeout)
       let applicationId: string | null = null;
-      const { data: applicationData } = await supabase
-        .from('applications')
-        .select('id')
-        .eq('job_id', job.id)
-        .eq('teacher_id', userData.user.id)
-        .single();
+      const fetchController = new AbortController();
+      const fetchTimeoutId = setTimeout(() => fetchController.abort(), 5000);
       
-      applicationId = applicationData?.id || null;
-
-      // Auto-create conversation after successful application
       try {
-        const { conversation, isNew } = await getOrCreateConversation(
-          userData.user.id, // teacher_id
-          job.school_id,    // school_id
-          job.id           // job_id
-        );
+        const { data: applicationData } = await supabase
+          .from('applications')
+          .select('id')
+          .eq('job_id', job.id)
+          .eq('teacher_id', userData.user.id)
+          .single()
+          .abortSignal(fetchController.signal);
+        applicationId = applicationData?.id || null;
+        clearTimeout(fetchTimeoutId);
+      } catch (fetchErr: any) {
+        clearTimeout(fetchTimeoutId);
+        if (fetchErr.name === 'AbortError') {
+          console.warn('Application ID fetch timeout - application was inserted but ID fetch failed');
+          // Application was inserted, so we'll proceed without the ID
+        } else {
+          console.error('Error fetching application ID:', fetchErr);
+        }
+      }
 
-        // Create initial system message if conversation is new
-        if (isNew) {
-          await supabase.from('messages').insert({
-            conversation_id: conversation.id,
-            sender_id: userData.user.id,
-            content: `Application submitted for ${job.title} at ${job.school_name}`,
+      // Auto-create conversation after successful application (with timeout)
+      try {
+        const convController = new AbortController();
+        const convTimeoutId = setTimeout(() => convController.abort(), 10000);
+        
+        let conversation = null;
+        let isNew = false;
+        
+        try {
+          // Note: getOrCreateConversation doesn't support AbortController directly
+          // We'll wrap it in a Promise.race with timeout
+          const convPromise = getOrCreateConversation(
+            userData.user.id, // teacher_id
+            job.school_id,    // school_id
+            job.id           // job_id
+          );
+          
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Conversation creation timeout')), 10000);
           });
+          
+          const result = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
+          conversation = result.conversation;
+          isNew = result.isNew;
+          clearTimeout(convTimeoutId);
+        } catch (convErr: any) {
+          clearTimeout(convTimeoutId);
+          if (convErr.message === 'Conversation creation timeout') {
+            console.warn('Conversation creation timeout - skipping');
+          } else {
+            throw convErr;
+          }
+        }
+
+        // Create initial system message if conversation is new (with timeout)
+        if (conversation && isNew) {
+          const msgController = new AbortController();
+          const msgTimeoutId = setTimeout(() => msgController.abort(), 5000);
+          
+          try {
+            await supabase
+              .from('messages')
+              .insert({
+                conversation_id: conversation.id,
+                sender_id: userData.user.id,
+                content: `Application submitted for ${job.title} at ${job.school_name}`,
+              })
+              .abortSignal(msgController.signal);
+            clearTimeout(msgTimeoutId);
+          } catch (msgErr: any) {
+            clearTimeout(msgTimeoutId);
+            if (msgErr.name !== 'AbortError') {
+              console.error('Error creating initial message:', msgErr);
+            }
+          }
         }
       } catch (convError) {
         // Log error but don't fail the application
         console.error('Error creating conversation:', convError);
       }
 
-      // Notify school about new application (non-blocking)
+      // Notify school about new application (non-blocking, fire-and-forget)
       if (applicationId) {
-        try {
-          // Get teacher name
-          const { data: teacherData } = await supabase
-            .from('teachers')
-            .select('full_name')
-            .eq('user_id', userData.user.id)
-            .maybeSingle();
-          
-          const teacherName = teacherData?.full_name || 'A teacher';
-          await notifyNewApplication(
-            job.school_id,
-            applicationId,
-            teacherName,
-            job.title
-          );
-        } catch (notifError) {
+        // Don't await - fire and forget to prevent blocking
+        notifyNewApplication(
+          job.school_id,
+          applicationId,
+          'A teacher', // Default name if fetch fails
+          job.title
+        ).catch((notifError) => {
           console.error('Error sending notification:', notifError);
-        }
+        });
+        
+        // Try to get teacher name in background (non-blocking)
+        supabase
+          .from('teachers')
+          .select('full_name')
+          .eq('user_id', userData.user.id)
+          .maybeSingle()
+          .then(({ data: teacherData }) => {
+            if (teacherData?.full_name) {
+              // Re-notify with correct name (non-blocking)
+              notifyNewApplication(
+                job.school_id,
+                applicationId!,
+                teacherData.full_name,
+                job.title
+              ).catch(() => {
+                // Ignore errors in background notification
+              });
+            }
+          })
+          .catch(() => {
+            // Ignore errors in background fetch
+          });
       }
       
       // Clear draft after successful submission

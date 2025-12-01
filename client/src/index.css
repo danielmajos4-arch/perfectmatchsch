@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 
+ * Perfect Match Schools Brand System
+ * 
+ * Primary Colors:
+ * - Coral/Magenta: #C41E68 (primary)
+ * - Cyan/Mint: #00BCD4 (secondary)
+ * - Navy: #1E3A5F (accent-dark)
+ * 
+ * Archetype Colors:
+ * - The Guide: Emerald (#10B981)
+ * - The Trailblazer: Orange (#F97316)
+ * - The Changemaker: Violet (#8B5CF6)
+ * - The Connector: Pink (#EC4899)
+ * - The Explorer: Cyan (#06B6D4)
+ * - The Leader: Gold (#EAB308)
+ */
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);
@@ -42,11 +59,24 @@
   --success-foreground: 0 0% 98%;
   --warning: 45 100% 51%;
   --warning-foreground: 0 0% 9%;
+  
+  /* Brand Colors */
   --brand-cyan: 187 100% 42%;
   --brand-magenta: 331 82% 45%;
   --brand-orange: 14 100% 60%;
   --brand-yellow: 45 100% 51%;
   --brand-green: 122 39% 49%;
+  --brand-coral: 331 82% 45%;
+  --brand-mint: 187 100% 42%;
+  --brand-navy: 213 52% 24%;
+  
+  /* Archetype Colors */
+  --archetype-guide: 160 84% 39%;
+  --archetype-trailblazer: 25 95% 53%;
+  --archetype-changemaker: 263 70% 50%;
+  --archetype-connector: 330 81% 60%;
+  --archetype-explorer: 189 95% 43%;
+  --archetype-leader: 48 96% 53%;
   --chart-1: 217 91% 45%;
   --chart-2: 142 76% 36%;
   --chart-3: 280 70% 45%;
@@ -193,10 +223,28 @@
     @apply font-sans antialiased bg-background text-foreground;
     /* Smooth scrolling */
     scroll-behavior: smooth;
+    /* Prevent text inflation on mobile */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Skip link for screen readers */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 
+           focus:bg-background focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg 
+           focus:ring-2 focus:ring-ring focus:outline-none;
   }
 
   /* Enhanced focus styles for accessibility */
   *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Focus within for custom components */
+  [role="button"]:focus-visible,
+  [role="link"]:focus-visible,
+  [role="menuitem"]:focus-visible,
+  [role="option"]:focus-visible,
+  [role="tab"]:focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
@@ -213,6 +261,43 @@
   /* Improved link styles */
   a {
     @apply transition-colors duration-200;
+  }
+
+  /* Reduced motion preference */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* High contrast mode improvements */
+  @media (prefers-contrast: high) {
+    * {
+      --border: 0 0% 0%;
+    }
+  }
+
+  /* Touch target sizing (44px minimum for mobile) */
+  button,
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select,
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Exception for small buttons in tight spaces */
+  button.btn-sm,
+  .btn-icon-sm {
+    min-height: 32px;
+    min-width: 32px;
   }
 }
 

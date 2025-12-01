@@ -24,6 +24,7 @@ import { NotificationCenter } from '@/components/NotificationCenter';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { cn } from '@/lib/utils';
+import type { Teacher } from '@shared/schema';
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -31,7 +32,7 @@ interface AuthenticatedLayoutProps {
 }
 
 export function AuthenticatedLayout({ children, showMobileNav = true }: AuthenticatedLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, role } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -72,6 +73,40 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
       setUnreadCount(notifications.length);
     }
   }, [notifications]);
+
+  // Fetch teacher profile for avatar photo
+  const { data: teacherProfile } = useQuery<Teacher>({
+    queryKey: ['/api/teacher-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('profile_photo_url, full_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as Teacher | null;
+    },
+    enabled: !!user?.id && role === 'teacher',
+  });
+
+  // Fetch school profile for logo
+  const { data: schoolProfile } = useQuery({
+    queryKey: ['/api/school-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('schools')
+        .select('logo_url, school_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+    enabled: !!user?.id && role === 'school',
+  });
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -167,13 +202,31 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 gap-2 px-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.user_metadata?.avatar_url} />
+                      <AvatarImage 
+                        src={
+                          role === 'teacher' && teacherProfile?.profile_photo_url
+                            ? teacherProfile.profile_photo_url
+                            : role === 'school' && schoolProfile?.logo_url
+                            ? schoolProfile.logo_url
+                            : undefined
+                        } 
+                      />
                       <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                        {getInitials(user.user_metadata?.full_name || user.email || 'U')}
+                        {getInitials(
+                          role === 'teacher' && teacherProfile?.full_name
+                            ? teacherProfile.full_name
+                            : role === 'school' && schoolProfile?.school_name
+                            ? schoolProfile.school_name
+                            : user.user_metadata?.full_name || user.email || 'U'
+                        )}
                       </AvatarFallback>
                     </Avatar>
                     <span className="hidden sm:inline text-sm font-medium">
-                      {user.user_metadata?.full_name?.split(' ')[0] || 'User'}
+                      {role === 'teacher' && teacherProfile?.full_name
+                        ? teacherProfile.full_name.split(' ')[0]
+                        : role === 'school' && schoolProfile?.school_name
+                        ? schoolProfile.school_name.split(' ')[0]
+                        : user.user_metadata?.full_name?.split(' ')[0] || 'User'}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -181,7 +234,11 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium">
-                        {user.user_metadata?.full_name || 'User'}
+                        {role === 'teacher' && teacherProfile?.full_name
+                          ? teacherProfile.full_name
+                          : role === 'school' && schoolProfile?.school_name
+                          ? schoolProfile.school_name
+                          : user.user_metadata?.full_name || 'User'}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {user.email}
@@ -205,6 +262,7 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                   <DropdownMenuItem
                     onClick={async () => {
                       await supabase.auth.signOut();
+                      setLocation('/login');
                     }}
                     className="text-destructive"
                   >

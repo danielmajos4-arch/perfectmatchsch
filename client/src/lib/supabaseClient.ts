@@ -32,4 +32,40 @@ Note: Vite requires environment variables to be prefixed with VITE_ to be expose
   throw new Error(errorMessage);
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * Supabase client with PWA-optimized configuration
+ * 
+ * Auth options:
+ * - persistSession: true - Keeps session in localStorage for offline/PWA access
+ * - autoRefreshToken: true - Automatically refreshes tokens before expiry
+ * - detectSessionInUrl: true - Handles OAuth callback URLs
+ * - flowType: 'pkce' - More secure flow that works better with PWAs
+ */
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    // Use localStorage for session storage (works in PWA)
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storageKey: 'perfectmatch-auth',
+  },
+  // Global fetch options for better error handling
+  global: {
+    fetch: async (url, options) => {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          // Add timeout signal if not already present
+          signal: options?.signal || AbortSignal.timeout(15000),
+        });
+        return response;
+      } catch (error) {
+        // Log fetch errors for debugging
+        console.error('[Supabase] Fetch error:', error);
+        throw error;
+      }
+    },
+  },
+});

@@ -127,16 +127,26 @@ export function ArchetypeResults({
         </CardContent>
       </Card>
 
-      <div className="flex justify-center pt-4">
+      <div className="flex flex-col sm:flex-row justify-center gap-3 pt-4">
         <Button
           size="lg"
           onClick={handleContinue}
           data-testid="button-continue-dashboard"
-          className="px-8"
+          className="w-full sm:w-auto min-h-12 px-8"
           disabled={continueDisabled}
         >
           Continue to Dashboard
         </Button>
+        {!continueDisabled && (
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => window.location.href = '/profile'}
+            className="w-full sm:w-auto min-h-12 px-8"
+          >
+            Complete Profile
+          </Button>
+        )}
       </div>
       {continueDisabled && continueDisabledMessage && (
         <p className="text-center text-sm text-destructive" data-testid="text-onboarding-incomplete">

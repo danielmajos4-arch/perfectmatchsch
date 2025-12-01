@@ -115,3 +115,5 @@ server/public/
 *.swp
 .cache
 .parcel-cache
+.vercel
+.env*.local

@@ -770,12 +770,17 @@ export default function SchoolDashboard() {
                             return;
                           }
                           
-                          // Get or create conversation
-                          const { conversation } = await getOrCreateConversation(
+                          // Get or create conversation (with timeout)
+                          const convPromise = getOrCreateConversation(
                             app.teacher_id,
                             user.id,
                             jobId
                           );
+                          const timeoutPromise = new Promise((_, reject) => {
+                            setTimeout(() => reject(new Error('Conversation creation timed out. Please try again.')), 10000);
+                          });
+                          
+                          const { conversation } = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
                           
                           // Navigate to messages
                           setLocation(`/messages?conversation=${conversation.id}`);
