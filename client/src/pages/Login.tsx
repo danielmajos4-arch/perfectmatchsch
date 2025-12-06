@@ -84,33 +84,34 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center px-3 sm:px-4 py-6 sm:py-8 safe-bottom">
       <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-10">
-          <Link href="/" className="mb-6" data-testid="link-home">
+        {/* Logo - Responsive sizing */}
+        <div className="flex flex-col items-center mb-6 sm:mb-10">
+          <Link href="/" className="mb-4 sm:mb-6" data-testid="link-home">
             <img
               src={logoUrl}
               alt="PerfectMatchSchools"
-              className="h-32 w-auto drop-shadow-2xl"
+              className="h-20 sm:h-28 md:h-32 w-auto drop-shadow-2xl"
               style={{
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
-                transform: 'scale(1.08)'
               }}
             />
           </Link>
-          <p className="text-muted-foreground text-center text-base">
+          <p className="text-muted-foreground text-center text-sm sm:text-base px-4">
             Connect with teaching opportunities that match your passion
           </p>
         </div>
 
-        <Card className="p-8 shadow-medium border-border/50">
-          <CardHeader className="space-y-2 p-0 mb-8">
-            <CardTitle className="text-3xl font-bold">Welcome back</CardTitle>
-            <CardDescription className="text-base">Enter your email to sign in to your account</CardDescription>
+        {/* Login Card - Mobile optimized padding */}
+        <Card className="p-5 sm:p-6 md:p-8 shadow-medium border-border/50">
+          <CardHeader className="space-y-1 sm:space-y-2 p-0 mb-5 sm:mb-8">
+            <CardTitle className="text-2xl sm:text-3xl font-bold">Welcome back</CardTitle>
+            <CardDescription className="text-sm sm:text-base">Enter your email to sign in to your account</CardDescription>
           </CardHeader>
 
           <CardContent className="p-0">
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
                   Email
@@ -122,17 +123,18 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-12"
+                  className="h-12 sm:h-12 text-base"
                   data-testid="input-email"
+                  autoComplete="email"
                 />
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <Label htmlFor="password" className="text-sm font-medium">
                     Password
                   </Label>
-                  <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                  <Link href="/forgot-password" className="text-xs sm:text-sm text-primary hover:underline whitespace-nowrap">
                     Forgot password?
                   </Link>
                 </div>
@@ -143,14 +145,15 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-12"
+                  className="h-12 sm:h-12 text-base"
                   data-testid="input-password"
+                  autoComplete="current-password"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full h-12 font-medium"
+                className="w-full h-12 sm:h-12 font-medium text-base active:scale-[0.98] touch-manipulation"
                 disabled={isLoading}
                 data-testid="button-login"
               >
@@ -159,7 +162,7 @@ export default function Login() {
             </form>
           </CardContent>
 
-          <CardFooter className="flex flex-col gap-4 p-0 mt-6">
+          <CardFooter className="flex flex-col gap-3 sm:gap-4 p-0 mt-5 sm:mt-6">
             <p className="text-sm text-center text-muted-foreground">
               Don't have an account?{' '}
               <Link href="/register" className="text-primary font-medium hover:underline" data-testid="link-register">

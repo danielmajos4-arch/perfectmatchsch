@@ -234,24 +234,29 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
 
   return (
     <>
-      {/* Mobile Backdrop */}
-      {isMobile && isOpen && (
+      {/* Mobile Backdrop - Smooth fade */}
+      {isMobile && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
+          className={cn(
+            "fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm transition-all duration-300 ease-out",
+            isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
+          )}
           onClick={onClose}
+          aria-hidden="true"
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Smooth slide with spring effect */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-card/95 backdrop-blur-md border-r border-border z-50 transition-transform duration-300 ease-in-out',
-          'flex flex-col shadow-xl',
-          isMobile
-            ? 'w-72'
-            : 'w-64 lg:w-72', // 240px mobile, 256px tablet, 288px desktop
+          'fixed left-0 top-0 h-full bg-card/98 backdrop-blur-md border-r border-border z-50',
+          'flex flex-col shadow-2xl',
+          'transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+          'w-[280px] sm:w-72 lg:w-72', // Consistent width
           isMobile && !isOpen && '-translate-x-full',
-          !isMobile && 'translate-x-0'
+          !isMobile && 'translate-x-0',
+          // Safe area for notched devices
+          'pb-safe-bottom'
         )}
         data-sidebar
       >
@@ -329,8 +334,8 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
           </div>
         )}
 
-        {/* Navigation Items */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
+        {/* Navigation Items - Touch optimized */}
+        <nav className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-1 hide-scrollbar">
           {navItems.map((item, index) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -341,7 +346,8 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
                 <Button
                   variant="ghost"
                   className={cn(
-                    'w-full justify-start gap-3 h-12 rounded-xl transition-all duration-200',
+                    'w-full justify-start gap-3 min-h-[48px] h-12 sm:h-11 rounded-xl transition-all duration-200',
+                    'active:scale-[0.98] touch-manipulation',
                     active
                       ? 'bg-primary/10 text-primary font-semibold shadow-sm'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -350,7 +356,6 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
                     // Handle hash routes with smooth scroll
                     if (item.href.includes('#')) {
                       const [path, hash] = item.href.split('#');
-                      // Navigate to path first, then scroll to hash
                       setTimeout(() => {
                         const element = document.getElementById(hash);
                         if (element) {
@@ -364,10 +369,10 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
                     }
                   }}
                 >
-                  <Icon className={cn("h-5 w-5 flex-shrink-0 transition-colors", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-                  <span className="flex-1 text-left">{item.label}</span>
+                  <Icon className={cn("h-5 w-5 flex-shrink-0 transition-colors", active ? "text-primary" : "text-muted-foreground")} />
+                  <span className="flex-1 text-left text-sm sm:text-base">{item.label}</span>
                   {hasBadge && (
-                    <Badge variant="default" className="ml-auto h-5 min-w-5 px-1.5 text-xs animate-pulse">
+                    <Badge variant="default" className="ml-auto h-5 min-w-5 px-1.5 text-xs">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </Badge>
                   )}
@@ -395,12 +400,12 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
           </div>
         )}
 
-        {/* Bottom Section */}
-        <div className="p-4 border-t border-border/50 space-y-1 bg-muted/10">
+        {/* Bottom Section - Touch optimized with safe area */}
+        <div className="p-3 sm:p-4 border-t border-border/50 space-y-1 bg-muted/10 safe-bottom">
           <Link href="/settings">
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 h-11 hover:bg-background hover:shadow-sm rounded-xl text-muted-foreground hover:text-foreground"
+              className="w-full justify-start gap-3 min-h-[48px] h-12 sm:h-11 hover:bg-background hover:shadow-sm rounded-xl text-muted-foreground hover:text-foreground active:scale-[0.98] touch-manipulation"
               onClick={() => {
                 if (isMobile && onClose) {
                   onClose();
@@ -416,7 +421,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
             <Link href="/test-email">
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 h-11 hover:bg-background hover:shadow-sm rounded-xl text-muted-foreground hover:text-foreground"
+                className="w-full justify-start gap-3 min-h-[48px] h-12 sm:h-11 hover:bg-background hover:shadow-sm rounded-xl text-muted-foreground hover:text-foreground active:scale-[0.98] touch-manipulation"
                 onClick={() => {
                   if (isMobile && onClose) {
                     onClose();
@@ -430,7 +435,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
           )}
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 h-11 hover:bg-destructive/10 hover:text-destructive rounded-xl text-muted-foreground"
+            className="w-full justify-start gap-3 min-h-[48px] h-12 sm:h-11 hover:bg-destructive/10 hover:text-destructive rounded-xl text-muted-foreground active:scale-[0.98] touch-manipulation"
             onClick={handleLogout}
           >
             <LogOut className="h-5 w-5" />

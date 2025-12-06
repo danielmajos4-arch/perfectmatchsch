@@ -87,17 +87,16 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Minimal Top Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-background/95 backdrop-blur-sm border-b border-border z-30">
-        <div className="h-full flex items-center justify-between px-4 lg:pl-72 lg:pr-6">
-          {/* Left: Empty on desktop, hamburger on mobile */}
-          {/* Left: Hamburger (mobile only) */}
+      {/* Minimal Top Header - Safe area aware */}
+      <header className="fixed top-0 left-0 right-0 h-14 sm:h-16 bg-background/95 backdrop-blur-sm border-b border-border z-30">
+        <div className="h-full flex items-center justify-between px-3 sm:px-4 lg:pl-72 lg:pr-6">
+          {/* Left: Hamburger (mobile only) - Touch friendly 44px */}
           <div className="flex items-center">
             {showMobileNav && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-9 w-9"
+                className="lg:hidden h-11 w-11 min-h-touch min-w-touch"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 data-hamburger
                 aria-label="Toggle sidebar"
@@ -112,15 +111,15 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
           </div>
 
           {/* Right: Notifications, Settings, User */}
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Notifications */}
-            <NotificationCenter className="h-9 w-9" />
+          <div className="flex items-center gap-1 sm:gap-2 ml-auto">
+            {/* Notifications - Touch friendly */}
+            <NotificationCenter className="h-10 w-10 sm:h-9 sm:w-9" />
 
-            {/* Settings */}
+            {/* Settings - Hidden on small mobile, visible on larger */}
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9"
+              className="hidden xs:flex h-10 w-10 sm:h-9 sm:w-9"
               asChild
               aria-label="Settings"
             >
@@ -193,9 +192,11 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      // Force a full page reload to clear all state
+                    onClick={() => {
+                      // Clear storage immediately and redirect
+                      localStorage.removeItem('perfectmatch-auth');
+                      sessionStorage.clear();
+                      supabase.auth.signOut().catch(() => {});
                       window.location.href = '/login';
                     }}
                     className="text-destructive"
@@ -217,15 +218,15 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
         isMobile={isMobile}
       />
 
-      {/* Main Content */}
+      {/* Main Content - Properly offset for header and sidebar */}
       <main
         className={cn(
-          'pt-16 transition-all duration-300 ease-in-out',
+          'pt-14 sm:pt-16 transition-all duration-300 ease-in-out',
           'lg:pl-72', // Sidebar width on desktop (288px = 72 * 4)
           'min-h-screen bg-background'
         )}
       >
-        <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+        <div className="px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-8 max-w-7xl mx-auto">
           {children}
         </div>
       </main>

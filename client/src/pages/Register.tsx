@@ -210,29 +210,30 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center px-3 sm:px-4 py-6 sm:py-8 safe-bottom">
       <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-10">
-          <Link href="/" className="mb-6" data-testid="link-home">
+        {/* Logo - Responsive sizing */}
+        <div className="flex flex-col items-center mb-6 sm:mb-10">
+          <Link href="/" className="mb-4 sm:mb-6" data-testid="link-home">
             <img
               src={logoUrl}
               alt="PerfectMatchSchools"
-              className="h-32 w-auto drop-shadow-2xl"
+              className="h-20 sm:h-28 md:h-32 w-auto drop-shadow-2xl"
               style={{
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
-                transform: 'scale(1.08)'
               }}
             />
           </Link>
-          <p className="text-muted-foreground text-center text-base">
+          <p className="text-muted-foreground text-center text-sm sm:text-base px-4">
             Join thousands of educators and schools
           </p>
         </div>
 
-        <Card className="p-8 shadow-medium border-border/50">
-          <CardHeader className="space-y-2 p-0 mb-8">
-            <CardTitle className="text-3xl font-bold">Create an account</CardTitle>
-            <CardDescription className="text-base">Enter your information to get started</CardDescription>
+        {/* Register Card - Mobile optimized */}
+        <Card className="p-5 sm:p-6 md:p-8 shadow-medium border-border/50">
+          <CardHeader className="space-y-1 sm:space-y-2 p-0 mb-5 sm:mb-8">
+            <CardTitle className="text-2xl sm:text-3xl font-bold">Create an account</CardTitle>
+            <CardDescription className="text-sm sm:text-base">Enter your information to get started</CardDescription>
           </CardHeader>
 
           <CardContent className="p-0">
@@ -245,8 +246,8 @@ export default function Register() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Name/School Name Field - Conditional based on role */}
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+              {/* Name/School Name Field */}
               <div className="space-y-2">
                 <Label htmlFor="fullName" className="text-sm font-medium">
                   {formData.role === 'school' ? 'School Name' : 'Full Name'}
@@ -262,12 +263,13 @@ export default function Register() {
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   required
-                  className="h-12"
+                  className="h-12 text-base"
                   data-testid="input-fullname"
+                  autoComplete="name"
                 />
               </div>
 
-              {/* Email Field - Conditional label and placeholder based on role */}
+              {/* Email Field */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
                   {formData.role === 'school' ? 'School Email' : 'Email'}
@@ -283,8 +285,9 @@ export default function Register() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
-                  className="h-12"
+                  className="h-12 text-base"
                   data-testid="input-email"
+                  autoComplete="email"
                 />
                 {formData.role === 'school' && (
                   <p className="text-xs text-muted-foreground">
@@ -306,12 +309,13 @@ export default function Register() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
                   minLength={6}
-                  className="h-12"
+                  className="h-12 text-base"
                   data-testid="input-password"
+                  autoComplete="new-password"
                 />
               </div>
 
-              {/* Role Field - Disabled if set from URL */}
+              {/* Role Field */}
               <div className="space-y-2">
                 <Label htmlFor="role" className="text-sm font-medium">
                   I am a
@@ -322,18 +326,18 @@ export default function Register() {
                   required
                   disabled={isRoleLocked}
                 >
-                  <SelectTrigger className="h-12" data-testid="select-role">
+                  <SelectTrigger className="h-12 text-base" data-testid="select-role">
                     <SelectValue placeholder="Select your role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="teacher">Teacher</SelectItem>
-                    <SelectItem value="school">School</SelectItem>
+                    <SelectItem value="teacher" className="py-3">Teacher</SelectItem>
+                    <SelectItem value="school" className="py-3">School</SelectItem>
                   </SelectContent>
                 </Select>
                 {isRoleLocked && (
                   <Alert className="mt-3">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
+                    <AlertDescription className="text-sm">
                       {formData.role === 'school'
                         ? "You're signing up as a School to find teachers"
                         : "You're signing up as a Teacher to browse schools"}
@@ -344,7 +348,7 @@ export default function Register() {
 
               <Button
                 type="submit"
-                className="w-full h-12 font-medium"
+                className="w-full h-12 font-medium text-base active:scale-[0.98] touch-manipulation"
                 disabled={isLoading}
                 data-testid="button-register"
               >
@@ -353,7 +357,7 @@ export default function Register() {
             </form>
           </CardContent>
 
-          <CardFooter className="flex flex-col gap-4 p-0 mt-6">
+          <CardFooter className="flex flex-col gap-3 sm:gap-4 p-0 mt-5 sm:mt-6">
             <p className="text-sm text-center text-muted-foreground">
               Already have an account?{' '}
               <Link href="/login" className="text-primary font-medium hover:underline" data-testid="link-login">
