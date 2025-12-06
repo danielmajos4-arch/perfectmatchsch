@@ -9,9 +9,73 @@ const logoUrl = '/images/logo.png';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, InfoIcon } from 'lucide-react';
 import { withTimeout, getAuthErrorMessage } from '@/lib/authUtils';
 import { useAuth } from '@/contexts/AuthContext';
+
+// Email domain validation
+const BLOCKED_DOMAINS = [
+  'gmail.com',
+  'yahoo.com',
+  'outlook.com',
+  'hotmail.com',
+  'icloud.com',
+  'aol.com',
+  'protonmail.com',
+  'mail.com',
+  'yandex.com',
+  'zoho.com',
+  'live.com',
+  'msn.com',
+  'yahoo.co.uk',
+  'googlemail.com',
+  'me.com',
+  'mac.com',
+];
+
+const ALLOWED_EDU_DOMAINS = [
+  '.edu',
+  '.edu.ng',
+  '.ac.uk',
+  '.edu.au',
+  '.ac.za',
+  '.edu.pk',
+  '.ac.in',
+  '.edu.gh',
+  '.ac.nz',
+  '.edu.my',
+];
+
+const validateSchoolEmail = (email: string): { valid: boolean; message?: string; isEduDomain?: boolean } => {
+  const domain = email.split('@')[1]?.toLowerCase();
+
+  if (!domain) {
+    return { valid: false, message: 'Invalid email format' };
+  }
+
+  // Check if blocked personal domain
+  if (BLOCKED_DOMAINS.includes(domain)) {
+    return {
+      valid: false,
+      message: 'Schools must use an institutional email address. Personal emails (Gmail, Yahoo, Outlook, etc.) are not allowed. Please use your school\'s official email domain.'
+    };
+  }
+
+  // Check if educational domain (auto-approved)
+  const isEduDomain = ALLOWED_EDU_DOMAINS.some(eduDomain => domain.endsWith(eduDomain));
+
+  if (isEduDomain) {
+    return { valid: true, isEduDomain: true }; // Educational domain - auto-approved
+  }
+
+  // Other domains - allowed but will require manual approval
+  return {
+    valid: true,
+    isEduDomain: false,
+    message: 'Your account will be reviewed before you can post jobs. This usually takes 24-48 hours.'
+  };
+};
+
 
 export default function Register() {
   const [location, setLocation] = useLocation();
@@ -19,6 +83,7 @@ export default function Register() {
   const { user, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [intent, setIntent] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -26,18 +91,11 @@ export default function Register() {
     role: '',
   });
 
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    if (!authLoading && user) {
-      setLocation('/dashboard');
-    }
-  }, [user, authLoading, setLocation]);
-
   // Read role from URL query parameter on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const roleParam = urlParams.get('role');
-     const intentParam = urlParams.get('intent');
+    const intentParam = urlParams.get('intent');
     if (roleParam === 'teacher' || roleParam === 'school') {
       setFormData(prev => ({ ...prev, role: roleParam }));
     }
@@ -49,15 +107,9 @@ export default function Register() {
   // Determine if role is locked (set from URL)
   const isRoleLocked = formData.role === 'teacher' || formData.role === 'school';
 
-  // If user is authenticated, return null while redirect happens
-  // Don't show a blocking "Redirecting..." spinner that can get stuck
-  if (user) {
-    return null;
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password.length < 6) {
       toast({
         title: 'Invalid password',
@@ -87,92 +139,74 @@ export default function Register() {
       return;
     }
 
-    // Optional: Warn schools about non-educational domains (but don't block)
+    // Additional validation for school emails
     if (formData.role === 'school') {
-      const educationalDomains = ['.edu', '.ac.', '.school', '.k12.'];
-      const hasEducationalDomain = educationalDomains.some(domain => 
-        formData.email.toLowerCase().includes(domain)
-      );
-      if (!hasEducationalDomain) {
-        // Just a warning, not blocking
-        console.log('School email does not appear to be from an educational domain');
+      const emailValidation = validateSchoolEmail(formData.email);
+
+      if (!emailValidation.valid) {
+        toast({
+          title: 'Invalid email domain',
+          description: emailValidation.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Show info message if manual approval needed
+      if (emailValidation.message && !emailValidation.isEduDomain) {
+        setInfoMessage(emailValidation.message);
+      } else {
+        setInfoMessage(null);
       }
     }
 
     setIsLoading(true);
+    console.log('[Register] Starting signup process...', { email: formData.email, role: formData.role });
 
     try {
-      // Wrap signUp with timeout to prevent hanging in PWA/offline mode
-      const { data: authData, error: authError } = await withTimeout(
-        supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            data: {
-              full_name: formData.fullName,
-              role: formData.role,
-            },
+      // 1. Sign up the user
+      console.log('[Register] Calling supabase.auth.signUp...');
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: undefined, // Disable magic link, use OTP
+          data: {
+            full_name: formData.fullName,
+            role: formData.role,
           },
-        }),
-        10000,
-        'Account creation'
-      );
+        },
+      });
 
-      // Only throw error if there's an actual backend error
       if (authError) {
+        console.error('[Register] Signup error:', authError);
         throw authError;
       }
 
-      // If signup succeeded (user was created)
-      if (authData.user) {
-        // Show success message
-        toast({
-          title: 'Account created!',
-          description: 'Welcome to PerfectMatchSchools. Please check your email to verify your account.',
-        });
+      console.log('[Register] Signup successful, redirecting to verify-email');
 
-        // Redirect based on role and intent
-        // Give a small delay to ensure toast is visible
-        setTimeout(() => {
-          if (formData.role === 'school') {
-            if (intent === 'find-teachers' || intent === 'search') {
-              // Schools coming from hero flow - send to school dashboard to find teachers
-              setLocation('/school/dashboard');
-            } else {
-              // Default school onboarding flow
-              setLocation('/onboarding/school');
-            }
-          } else if (formData.role === 'teacher') {
-            if (intent === 'browse-schools' || intent === 'search') {
-              // Teachers coming from hero flow - send directly to jobs to browse schools
-              setLocation('/jobs');
-            } else {
-              // Default teacher onboarding flow
-              setLocation('/onboarding/teacher');
-            }
-          } else {
-            // Fallback to generic dashboard (which will redirect based on role)
-            setLocation('/dashboard');
-          }
-        }, 500);
-      } else {
-        // This shouldn't happen, but handle it gracefully
-        throw new Error('User creation failed. Please try again.');
-      }
-    } catch (error: unknown) {
-      // Always show error to user if we catch an error
-      // This means the backend signup failed
+      // Store registration data in sessionStorage to pass to verify-email page
+      // This avoids dependency on auth state which can cause race conditions
+      sessionStorage.setItem('pendingVerification', JSON.stringify({
+        email: formData.email,
+        role: formData.role
+      }));
+
+      // Navigate to verify-email page
+      // The user is already signed in from signUp, so VerifyEmail can access the session
+      window.history.replaceState({ usr: { email: formData.email, role: formData.role } }, '', '/verify-email');
+      setLocation('/verify-email');
+
+    } catch (error: any) {
+      console.error('[Register] Registration error:', error);
       toast({
         title: 'Registration failed',
         description: getAuthErrorMessage(error),
         variant: 'destructive',
       });
-      
-      // Log error for debugging
-      console.error('Registration error:', error);
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only set loading to false on error
     }
+    // Do NOT set loading to false on success, to prevent any interference
   };
 
   return (
@@ -180,11 +214,11 @@ export default function Register() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-10">
           <Link href="/" className="mb-6" data-testid="link-home">
-            <img 
-              src={logoUrl} 
-              alt="PerfectMatchSchools" 
-              className="h-32 w-auto drop-shadow-2xl" 
-              style={{ 
+            <img
+              src={logoUrl}
+              alt="PerfectMatchSchools"
+              className="h-32 w-auto drop-shadow-2xl"
+              style={{
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
                 transform: 'scale(1.08)'
               }}
@@ -202,6 +236,15 @@ export default function Register() {
           </CardHeader>
 
           <CardContent className="p-0">
+            {infoMessage && (
+              <Alert className="mb-6 border-blue-200 bg-blue-50">
+                <InfoIcon className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-900">
+                  {infoMessage}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Name/School Name Field - Conditional based on role */}
               <div className="space-y-2">
@@ -212,7 +255,7 @@ export default function Register() {
                   id="fullName"
                   type="text"
                   placeholder={
-                    formData.role === 'school' 
+                    formData.role === 'school'
                       ? 'Enter your school/institution name'
                       : 'Enter your full name'
                   }
@@ -245,7 +288,7 @@ export default function Register() {
                 />
                 {formData.role === 'school' && (
                   <p className="text-xs text-muted-foreground">
-                    Please use an official school email address
+                    Please use an official school email address (not Gmail, Yahoo, etc.)
                   </p>
                 )}
               </div>

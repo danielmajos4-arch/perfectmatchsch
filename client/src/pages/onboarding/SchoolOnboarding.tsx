@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
@@ -29,6 +29,28 @@ const SCHOOL_TYPES = [
   'Other'
 ];
 
+// Educational email domains that get auto-approved
+const EDU_DOMAINS = [
+  '.edu',
+  '.edu.ng',
+  '.ac.uk',
+  '.edu.au',
+  '.ac.za',
+  '.edu.pk',
+  '.ac.in',
+  '.edu.gh',
+  '.ac.nz',
+  '.edu.my',
+];
+
+const determineApprovalStatus = (email: string): 'approved' | 'pending' => {
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return 'pending';
+
+  const isEduDomain = EDU_DOMAINS.some(eduDomain => domain.endsWith(eduDomain));
+  return isEduDomain ? 'approved' : 'pending';
+};
+
 export default function SchoolOnboarding() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -45,9 +67,26 @@ export default function SchoolOnboarding() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Email verification guard - redirect if email not verified
+  useEffect(() => {
+    if (user && !user.email_confirmed_at) {
+      console.log('[SchoolOnboarding] Email not verified, redirecting to verification page');
+      window.history.replaceState({ usr: { email: user.email } }, '', '/verify-email');
+      setLocation('/verify-email');
+    }
+  }, [user, setLocation]);
+
   const saveSchoolMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: typeof formData): Promise<InsertSchool> => {
+      console.log('[School Profile] Starting save with data:', {
+        ...data,
+        user_id: user?.id,
+        has_logo: !!data.logo_url
+      });
+
       if (!user) throw new Error('No user found');
+
+      const approvalStatus = determineApprovalStatus(user.email || '');
 
       const schoolData: InsertSchool = {
         user_id: user.id,
@@ -58,48 +97,103 @@ export default function SchoolOnboarding() {
         website: data.website || null,
         logo_url: data.logo_url || null,
         profile_complete: true,
+        approval_status: approvalStatus,
+        approved_at: approvalStatus === 'approved' ? new Date().toISOString() : null,
       };
 
-      const { data: existingSchool } = await supabase
-        .from('schools')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      console.log('[School Profile] Attempting database insert/update...');
 
-      if (existingSchool) {
-        const { error } = await supabase
+      // Add 20-second timeout
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Save timeout after 20s')), 20000)
+      );
+
+      const savePromise = (async () => {
+        const { data: existingSchool } = await supabase
           .from('schools')
-          .update(schoolData)
-          .eq('user_id', user.id);
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
 
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('schools')
-          .insert([schoolData]);
+        if (existingSchool) {
+          const { error } = await supabase
+            .from('schools')
+            .update(schoolData)
+            .eq('user_id', user.id);
 
-        if (error) throw error;
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('schools')
+            .insert([schoolData]);
 
-        // Create default email templates for new schools
-        try {
-          await createDefaultTemplates(user.id);
-        } catch (error) {
-          console.error('Error creating default templates:', error);
-          // Don't fail the onboarding if templates fail to create
+          if (error) throw error;
+
+          // Create default email templates for new schools
+          try {
+            await createDefaultTemplates(user.id);
+          } catch (error) {
+            console.error('Error creating default templates:', error);
+            // Don't fail the onboarding if templates fail to create
+          }
         }
-      }
+        return schoolData;
+      })();
 
-      return schoolData;
+      try {
+        const result = await Promise.race([savePromise, timeoutPromise]);
+        console.log('[School Profile] Save result:', result);
+        console.log('[School Profile] Save successful!');
+        return result;
+      } catch (error) {
+        console.error('[School Profile] Save failed:', error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (savedSchool: InsertSchool) => {
+      const approvalStatus = savedSchool?.approval_status || determineApprovalStatus(user?.email || '');
+
+      toast({
+        title: 'Profile saved successfully!',
+        description: approvalStatus === 'pending'
+          ? 'Your account is under review. You\'ll be notified once approved.'
+          : 'Redirecting to dashboard...',
+      });
+
       if (user?.id) {
         queryClient.invalidateQueries({ queryKey: ['/api/school-profile', user.id] });
       }
-      setLocation('/school/dashboard');
+
+      // Route based on approval status
+      if (approvalStatus === 'pending') {
+        setLocation('/school/pending-approval');
+      } else {
+        setLocation('/school/dashboard');
+      }
     },
     onError: (error: any) => {
-      console.error('Error saving school profile:', error);
-      setErrors({ submit: 'Failed to save profile. Please try again.' });
+      console.error('Profile save error:', error);
+
+      if (error.message?.includes('timeout')) {
+        toast({
+          title: 'Save timed out',
+          description: 'Please try again with a smaller logo file or check your connection.',
+          variant: 'destructive',
+        });
+      } else if (error.code === 'PGRST') {
+        toast({
+          title: 'Database error',
+          description: 'Please contact support.',
+          variant: 'destructive',
+        });
+      } else {
+        setErrors({ submit: `Failed to save profile: ${error.message}` });
+        toast({
+          title: 'Failed to save profile',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     },
   });
 
@@ -113,7 +207,7 @@ export default function SchoolOnboarding() {
     if (formData.description.length < 50) {
       newErrors.description = 'Description must be at least 50 characters';
     }
-    
+
     if (formData.website && !formData.website.match(/^https?:\/\/.+/)) {
       newErrors.website = 'Website must start with http:// or https://';
     }
@@ -129,7 +223,7 @@ export default function SchoolOnboarding() {
     setIsUploadingLogo(true);
     try {
       const result = await uploadProfileImage(user.id, file);
-      
+
       if (result.error) {
         toast({
           title: 'Upload failed',
@@ -139,7 +233,7 @@ export default function SchoolOnboarding() {
         return;
       }
 
-      setFormData(prev => ({ ...prev, logo_url: result.url }));
+      setFormData(prev => ({ ...prev, logo_url: result.url || '' }));
       toast({
         title: 'Logo uploaded',
         description: 'Your school logo has been uploaded successfully.',
@@ -176,11 +270,11 @@ export default function SchoolOnboarding() {
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center space-y-2">
           <div className="flex justify-center mb-4">
-            <img 
-              src={logoUrl} 
-              alt="PerfectMatchSchools" 
-              className="h-24 w-auto drop-shadow-2xl" 
-              style={{ 
+            <img
+              src={logoUrl}
+              alt="PerfectMatchSchools"
+              className="h-24 w-auto drop-shadow-2xl"
+              style={{
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
                 transform: 'scale(1.08)'
               }}

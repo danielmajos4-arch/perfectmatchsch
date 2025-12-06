@@ -68,17 +68,17 @@ export function HeroSearch() {
   return (
     <div className="w-full max-w-2xl">
       <Tabs value={searchType} onValueChange={(value) => setSearchType(value as 'teachers' | 'schools')} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-800/50 h-10 md:h-11">
+        <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-800/50 dark:bg-gray-900/70 h-10 md:h-11">
           <TabsTrigger 
             value="teachers" 
-            className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-300 font-medium text-sm md:text-base"
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-300 dark:data-[state=inactive]:text-gray-400 font-medium text-sm md:text-base"
             onClick={handleFindTeachersClick}
           >
             Find Teachers
           </TabsTrigger>
           <TabsTrigger 
             value="schools"
-            className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-300 font-medium text-sm md:text-base"
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-900 data-[state=inactive]:text-gray-300 dark:data-[state=inactive]:text-gray-400 font-medium text-sm md:text-base"
             onClick={handleBrowseSchoolsClick}
           >
             Browse Schools
@@ -89,7 +89,7 @@ export function HeroSearch() {
       <form onSubmit={handleSearch} className="w-full">
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500 pointer-events-none" />
             <Input
               type="text"
               placeholder={
@@ -99,13 +99,13 @@ export function HeroSearch() {
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-12 md:h-14 text-sm md:text-base bg-white border-gray-300 focus-visible:ring-2 focus-visible:ring-primary text-gray-900"
+              className="pl-10 h-12 md:h-14 text-sm md:text-base bg-white dark:bg-gray-100 border-gray-300 dark:border-gray-400 focus-visible:ring-2 focus-visible:ring-primary text-gray-900 dark:text-gray-900"
             />
           </div>
           <Button
             type="submit"
             size="lg"
-            className="h-12 md:h-14 px-6 md:px-8 font-semibold whitespace-nowrap bg-gray-900 hover:bg-gray-800 text-white"
+            className="h-12 md:h-14 px-6 md:px-8 font-semibold whitespace-nowrap bg-gray-900 dark:bg-gray-800 hover:bg-gray-800 dark:hover:bg-gray-700 text-white"
           >
             Search
           </Button>

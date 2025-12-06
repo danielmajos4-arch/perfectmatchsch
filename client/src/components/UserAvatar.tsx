@@ -41,7 +41,7 @@ export function UserAvatar({ userId, size = 'md', showName = false, clickable = 
     },
   });
 
-  const { data: teacherProfile } = useQuery<Teacher>({
+  const { data: teacherProfile } = useQuery<Teacher | null>({
     queryKey: ['/api/teacher-profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -61,7 +61,7 @@ export function UserAvatar({ userId, size = 'md', showName = false, clickable = 
   const displayName = teacherProfile?.full_name || user?.user_metadata?.full_name || 'User';
   const initials = displayName
     .split(' ')
-    .map(n => n[0])
+    .map((n: string) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);
@@ -69,8 +69,18 @@ export function UserAvatar({ userId, size = 'md', showName = false, clickable = 
   const dashboardPath = role === 'teacher' ? '/teacher/dashboard' : role === 'school' ? '/school/dashboard' : '/dashboard';
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setLocation('/');
+    try {
+      console.log('[UserAvatar] Logging out...');
+      await supabase.auth.signOut();
+      console.log('[UserAvatar] SignOut successful');
+    } catch (error) {
+      console.error('[UserAvatar] SignOut error:', error);
+      // Continue to redirect even if signOut fails
+    } finally {
+      // ALWAYS redirect, regardless of signOut success
+      console.log('[UserAvatar] Redirecting to login');
+      window.location.href = '/login';
+    }
   };
 
   const avatarContent = (

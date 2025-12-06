@@ -44,9 +44,10 @@ interface TeacherProfileData {
 interface TeacherProfileStepProps {
   onNext: (data: TeacherProfileData) => void;
   initialData?: Partial<TeacherProfileData>;
+  isLoading?: boolean;
 }
 
-export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, initialData }: TeacherProfileStepProps) {
+export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, initialData, isLoading }: TeacherProfileStepProps) {
   const [formData, setFormData] = useState<TeacherProfileData>({
     full_name: initialData?.full_name || '',
     phone: initialData?.phone || '',
@@ -430,17 +431,29 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
       )}
 
       <div className="flex justify-end">
-        <Button type="submit" size="lg" data-testid="button-next-profile" disabled={!isFormComplete} className="w-full sm:w-auto min-h-12">
-          Continue to Quiz
+        <Button type="submit" size="lg" data-testid="button-next-profile" disabled={!isFormComplete || isLoading} className="w-full sm:w-auto min-h-12">
+          {isLoading ? (
+            <>
+              <div className="h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+              Saving...
+            </>
+          ) : (
+            'Continue to Quiz'
+          )}
         </Button>
       </div>
     </form>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison function to prevent unnecessary re-renders
-  // Only re-render if onNext function reference changes or initialData actually changes
+  // Only re-render if onNext function reference changes, isLoading changes, or initialData actually changes
   if (prevProps.onNext !== nextProps.onNext) {
     return false; // Re-render if onNext changes
+  }
+  
+  // Re-render if loading state changes
+  if (prevProps.isLoading !== nextProps.isLoading) {
+    return false;
   }
   
   // Deep comparison of initialData

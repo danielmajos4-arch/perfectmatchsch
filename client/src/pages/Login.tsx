@@ -46,7 +46,24 @@ export default function Login() {
         'Sign in'
       );
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's an email not confirmed error
+        if (error.message.includes('not confirmed') || error.message.includes('Email not confirmed')) {
+          // Redirect to verification page
+          window.history.replaceState({ usr: { email } }, '', '/verify-email');
+          setLocation('/verify-email');
+          return;
+        }
+        throw error;
+      }
+
+      // Login successful - check verification status
+      if (data.user && !data.user.email_confirmed_at) {
+        // Signed in but not verified - redirect to verify
+        window.history.replaceState({ usr: { email: data.user.email } }, '', '/verify-email');
+        setLocation('/verify-email');
+        return;
+      }
 
       if (data.user) {
         toast({
@@ -55,7 +72,7 @@ export default function Login() {
         });
         setLocation('/dashboard');
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       toast({
         title: 'Login failed',
         description: getAuthErrorMessage(error),
@@ -71,11 +88,11 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-10">
           <Link href="/" className="mb-6" data-testid="link-home">
-            <img 
-              src={logoUrl} 
-              alt="PerfectMatchSchools" 
-              className="h-32 w-auto drop-shadow-2xl" 
-              style={{ 
+            <img
+              src={logoUrl}
+              alt="PerfectMatchSchools"
+              className="h-32 w-auto drop-shadow-2xl"
+              style={{
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
                 transform: 'scale(1.08)'
               }}
@@ -111,9 +128,14 @@ export default function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </Label>
+                  <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
                 <Input
                   id="password"
                   type="password"

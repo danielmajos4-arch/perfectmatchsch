@@ -2,6 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { calculateProfileCompletion, getMissingFields } from '@/lib/profileUtils';
+import { useTeacherProfile } from '@/hooks/useTeacherProfile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -22,20 +23,7 @@ export function ProfileCompletionGate({
 }: ProfileCompletionGateProps) {
   const { user, role } = useAuth();
 
-  const { data: teacher, isLoading } = useQuery({
-    queryKey: ['teacher-profile', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user && role === 'teacher',
-  });
+  const { data: teacher, isLoading } = useTeacherProfile(user?.id);
 
   if (role !== 'teacher') {
     // Only gate teacher experiences

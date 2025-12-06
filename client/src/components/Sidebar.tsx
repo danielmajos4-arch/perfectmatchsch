@@ -86,10 +86,10 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Get navigation items based on role
-  const navItems = role === 'admin' 
-    ? ADMIN_NAV_ITEMS 
-    : role === 'school' 
-      ? SCHOOL_NAV_ITEMS 
+  const navItems = role === 'admin'
+    ? ADMIN_NAV_ITEMS
+    : role === 'school'
+      ? SCHOOL_NAV_ITEMS
       : TEACHER_NAV_ITEMS;
 
   // Fetch unread notification count
@@ -183,13 +183,18 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
   const completionPercentage =
     role === 'teacher' && teacherProfile ? calculateProfileCompletion(teacherProfile) : 0;
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast({
-      title: 'Logged out',
-      description: 'You have been successfully logged out.',
-    });
-    setLocation('/login');
+  const handleLogout = () => {
+    console.log('[Sidebar] Logout - clearing session and redirecting');
+    
+    // Clear all auth storage immediately (don't wait for signOut)
+    localStorage.removeItem('perfectmatch-auth');
+    sessionStorage.clear();
+    
+    // Fire signOut in background (don't await - it hangs)
+    supabase.auth.signOut().catch(() => {});
+    
+    // Redirect immediately
+    window.location.href = '/login';
   };
 
   const getInitials = (name: string) => {
@@ -204,20 +209,20 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
   const isActive = (href: string) => {
     // Get current hash from window
     const currentHash = typeof window !== 'undefined' ? window.location.hash : '';
-    
+
     // Handle hash routes (e.g., /school/dashboard#post-job)
     if (href.includes('#')) {
       const [path, hash] = href.split('#');
       // For hash routes, BOTH path AND hash must match exactly
       return location === path && currentHash === `#${hash}`;
     }
-    
+
     // Handle dashboard routes (no hash)
     // Only match if we're on the exact dashboard path with NO hash
     if (href === '/school/dashboard' || href === '/teacher/dashboard') {
       return location === href && currentHash === '';
     }
-    
+
     // For all other routes, use exact matching only
     return location === href;
   };
@@ -232,7 +237,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
       {/* Mobile Backdrop */}
       {isMobile && isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
           onClick={onClose}
         />
       )}
@@ -240,10 +245,10 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-card border-r border-border z-50 transition-transform duration-300 ease-in-out',
-          'flex flex-col shadow-lg',
+          'fixed left-0 top-0 h-full bg-card/95 backdrop-blur-md border-r border-border z-50 transition-transform duration-300 ease-in-out',
+          'flex flex-col shadow-xl',
           isMobile
-            ? 'w-64'
+            ? 'w-72'
             : 'w-64 lg:w-72', // 240px mobile, 256px tablet, 288px desktop
           isMobile && !isOpen && '-translate-x-full',
           !isMobile && 'translate-x-0'
@@ -251,18 +256,21 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
         data-sidebar
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center justify-between p-6 border-b border-border/50">
           <Link href={role === 'admin' ? '/admin/dashboard' : role === 'school' ? '/school/dashboard' : '/teacher/dashboard'}>
-            <div className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <img 
-                src={logoUrl} 
-                alt="PerfectMatchSchools" 
-                className="h-8 w-auto"
-                style={{ 
-                  filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)) brightness(1.2) contrast(1.3) saturate(1.5)',
-                }}
-              />
-              <span className="font-semibold text-foreground hidden lg:inline text-sm">
+            <div className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/20 blur-lg rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                <img
+                  src={logoUrl}
+                  alt="PerfectMatchSchools"
+                  className="h-9 w-auto relative z-10"
+                  style={{
+                    filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))',
+                  }}
+                />
+              </div>
+              <span className="font-bold text-foreground hidden lg:inline text-base tracking-tight">
                 PerfectMatch
               </span>
             </div>
@@ -272,7 +280,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="h-8 w-8"
+              className="h-8 w-8 rounded-full hover:bg-muted"
               aria-label="Close sidebar"
             >
               <X className="h-5 w-5" />
@@ -282,35 +290,36 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
 
         {/* User Info Section */}
         {user && (
-          <div className="p-4 border-b border-border">
-            <Link href="/profile" className="flex items-center gap-3 group">
-              <Avatar className="h-10 w-10 group-hover:scale-105 transition-transform">
-                <AvatarImage 
+          <div className="p-6 border-b border-border/50 bg-muted/30">
+            <Link href="/profile" className="flex items-center gap-4 group">
+              <Avatar className="h-12 w-12 border-2 border-background shadow-sm group-hover:scale-105 transition-transform ring-2 ring-transparent group-hover:ring-primary/20">
+                <AvatarImage
                   src={
                     role === 'teacher' && teacherProfile?.profile_photo_url
                       ? teacherProfile.profile_photo_url
                       : role === 'school' && schoolProfile?.logo_url
-                      ? schoolProfile.logo_url
-                      : undefined
-                  } 
+                        ? schoolProfile.logo_url
+                        : undefined
+                  }
+                  className="object-cover"
                 />
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
                   {getInitials(
                     role === 'teacher' && teacherProfile?.full_name
                       ? teacherProfile.full_name
                       : role === 'school' && schoolProfile?.school_name
-                      ? schoolProfile.school_name
-                      : user.user_metadata?.full_name || user.email || 'U'
+                        ? schoolProfile.school_name
+                        : user.user_metadata?.full_name || user.email || 'U'
                   )}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0 hidden lg:block">
-                <p className="text-sm font-medium text-foreground truncate">
+                <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {role === 'teacher' && teacherProfile?.full_name
                     ? teacherProfile.full_name
                     : role === 'school' && schoolProfile?.school_name
-                    ? schoolProfile.school_name
-                    : user.user_metadata?.full_name || 'User'}
+                      ? schoolProfile.school_name
+                      : user.user_metadata?.full_name || 'User'}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {user.email}
@@ -321,7 +330,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
         )}
 
         {/* Navigation Items */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
           {navItems.map((item, index) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -330,11 +339,12 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
             return (
               <Link key={`${item.label}-${item.href}-${index}`} href={item.href}>
                 <Button
-                  variant={active ? 'secondary' : 'ghost'}
+                  variant="ghost"
                   className={cn(
-                    'w-full justify-start gap-3 h-11',
-                    active && 'bg-primary/10 text-primary font-medium',
-                    'hover:bg-primary/5 transition-colors'
+                    'w-full justify-start gap-3 h-12 rounded-xl transition-all duration-200',
+                    active
+                      ? 'bg-primary/10 text-primary font-semibold shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
                   onClick={(e) => {
                     // Handle hash routes with smooth scroll
@@ -348,16 +358,16 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
                         }
                       }, 100);
                     }
-                    
+
                     if (isMobile && onClose) {
                       onClose();
                     }
                   }}
                 >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
+                  <Icon className={cn("h-5 w-5 flex-shrink-0 transition-colors", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
                   <span className="flex-1 text-left">{item.label}</span>
                   {hasBadge && (
-                    <Badge variant="default" className="ml-auto h-5 min-w-5 px-1.5 text-xs">
+                    <Badge variant="default" className="ml-auto h-5 min-w-5 px-1.5 text-xs animate-pulse">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </Badge>
                   )}
@@ -369,25 +379,28 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
 
         {/* Profile completion indicator for teachers */}
         {role === 'teacher' && teacherProfile && (
-          <div className="px-4 py-3 border-t border-border">
+          <div className="px-6 py-4 border-t border-border/50 bg-muted/10">
             <Link href="/profile">
-              <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent cursor-pointer">
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Profile Completion</p>
-                  <Progress value={completionPercentage} className="h-2 mt-1" />
+              <div className="flex flex-col gap-2 p-3 rounded-xl hover:bg-muted/50 cursor-pointer transition-colors border border-transparent hover:border-border/50">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Profile Status</p>
+                  <span className={cn(
+                    "text-xs font-bold px-2 py-0.5 rounded-full",
+                    completionPercentage === 100 ? "bg-green-100 text-green-700" : "bg-primary/10 text-primary"
+                  )}>{completionPercentage}%</span>
                 </div>
-                <span className="text-sm font-bold">{completionPercentage}%</span>
+                <Progress value={completionPercentage} className="h-2" />
               </div>
             </Link>
           </div>
         )}
 
         {/* Bottom Section */}
-        <div className="p-4 border-t border-border space-y-1">
+        <div className="p-4 border-t border-border/50 space-y-1 bg-muted/10">
           <Link href="/settings">
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 h-11 hover:bg-primary/5"
+              className="w-full justify-start gap-3 h-11 hover:bg-background hover:shadow-sm rounded-xl text-muted-foreground hover:text-foreground"
               onClick={() => {
                 if (isMobile && onClose) {
                   onClose();
@@ -403,7 +416,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
             <Link href="/test-email">
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 h-11 hover:bg-primary/5"
+                className="w-full justify-start gap-3 h-11 hover:bg-background hover:shadow-sm rounded-xl text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   if (isMobile && onClose) {
                     onClose();
@@ -417,7 +430,7 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
           )}
           <Button
             variant="ghost"
-            className="w-full justify-start gap-3 h-11 hover:bg-destructive/10 hover:text-destructive"
+            className="w-full justify-start gap-3 h-11 hover:bg-destructive/10 hover:text-destructive rounded-xl text-muted-foreground"
             onClick={handleLogout}
           >
             <LogOut className="h-5 w-5" />

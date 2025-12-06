@@ -9,7 +9,7 @@ import { supabase } from './supabaseClient';
 export interface InAppNotification {
   id: string;
   user_id: string;
-  type: 'new_job_match' | 'new_candidate_match' | 'application_status' | 'message' | 'profile_viewed' | 'achievement_unlocked' | 'job_posted' | 'candidate_contacted';
+  type: 'new_job_match' | 'new_candidate_match' | 'new_application' | 'application_status' | 'message' | 'profile_viewed' | 'achievement_unlocked' | 'job_posted' | 'candidate_contacted';
   title: string;
   message: string;
   link_url: string | null;
@@ -276,14 +276,14 @@ export async function notifyNewApplication(
 ): Promise<void> {
   await createNotification(
     schoolUserId,
-    'new_candidate_match',
-    'New Application Received',
+    'new_application',
+    'New Application Received! 🎉',
     `${teacherName} applied for "${jobTitle}"`,
     {
       linkUrl: `/school/dashboard#applications`,
       linkText: 'View Application',
       icon: '📨',
-      metadata: { application_id: applicationId, job_title: jobTitle },
+      metadata: { application_id: applicationId, job_title: jobTitle, teacher_name: teacherName },
     }
   );
 }
@@ -294,7 +294,8 @@ export async function notifyJobPostedToTeachers(
   jobTitle: string,
   schoolName: string
 ): Promise<void> {
-  // Create notifications for all matching teachers
+  // Create notifications for all matching teachers with timeout
+  const notificationTimeout = 10000; // 10 seconds for all notifications
   const promises = teacherUserIds.map(userId =>
     createNotification(
       userId,
@@ -310,6 +311,20 @@ export async function notifyJobPostedToTeachers(
     )
   );
 
-  await Promise.all(promises);
+  const notificationsPromise = Promise.all(promises);
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Notifications timed out')), notificationTimeout);
+  });
+
+  try {
+    await Promise.race([notificationsPromise, timeoutPromise]);
+  } catch (error: any) {
+    if (error.message?.includes('timed out')) {
+      console.warn('notifyJobPostedToTeachers: Notifications timed out, some may not have been sent');
+      // Don't throw - allow job creation to succeed even if notifications fail
+    } else {
+      throw error;
+    }
+  }
 }
 

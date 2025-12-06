@@ -21,15 +21,15 @@ export async function getOrCreateConversation(
   let findError = null;
   
   try {
-    let query = supabase
-      .from('conversations')
-      .select('*')
-      .eq('teacher_id', teacherId)
-      .eq('school_id', schoolId);
+  let query = supabase
+    .from('conversations')
+    .select('*')
+    .eq('teacher_id', teacherId)
+    .eq('school_id', schoolId);
 
-    if (jobId) {
-      query = query.eq('job_id', jobId);
-    }
+  if (jobId) {
+    query = query.eq('job_id', jobId);
+  }
 
     const result = await query.maybeSingle().abortSignal(query1Controller.signal);
     existingWithJob = result.data;
@@ -65,10 +65,10 @@ export async function getOrCreateConversation(
   
   try {
     const result = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('teacher_id', teacherId)
-      .eq('school_id', schoolId)
+    .from('conversations')
+    .select('*')
+    .eq('teacher_id', teacherId)
+    .eq('school_id', schoolId)
       .maybeSingle()
       .abortSignal(query2Controller.signal);
     existingWithoutJob = result.data;
@@ -98,18 +98,18 @@ export async function getOrCreateConversation(
       
       try {
         const result = await supabase
-          .from('conversations')
-          .update({ job_id: jobId })
-          .eq('id', existingWithoutJob.id)
-          .select()
+        .from('conversations')
+        .update({ job_id: jobId })
+        .eq('id', existingWithoutJob.id)
+        .select()
           .single()
           .abortSignal(updateController.signal);
         clearTimeout(updateTimeoutId);
-        
+
         if (result.data) {
           console.log('[getOrCreateConversation] Updated existing conversation with job_id');
           return { conversation: result.data, isNew: false };
-        }
+      }
       } catch (err: any) {
         clearTimeout(updateTimeoutId);
         if (err.name === 'AbortError') {
@@ -137,18 +137,18 @@ export async function getOrCreateConversation(
 
   try {
     const result = await supabase
-      .from('conversations')
-      .insert(insertData)
-      .select()
+    .from('conversations')
+    .insert(insertData)
+    .select()
       .single()
       .abortSignal(insertController.signal);
     clearTimeout(insertTimeoutId);
-    
+
     if (result.error) {
       console.error('[getOrCreateConversation] Insert error:', result.error);
       throw result.error;
-    }
-    
+  }
+
     console.log('[getOrCreateConversation] Created new conversation');
     return { conversation: result.data, isNew: true };
   } catch (err: any) {

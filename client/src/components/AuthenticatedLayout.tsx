@@ -19,12 +19,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Bell, Settings, Menu, X, User, LogOut } from 'lucide-react';
+import { Settings, Menu, X, User, LogOut } from 'lucide-react';
 import { NotificationCenter } from '@/components/NotificationCenter';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabaseClient';
 import { cn } from '@/lib/utils';
-import type { Teacher } from '@shared/schema';
+import { useTeacherProfile } from '@/hooks/useTeacherProfile';
+import { useSchoolProfile } from '@/hooks/useSchoolProfile';
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -35,13 +35,12 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
   const [location, setLocation] = useLocation();
   const { user, role } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
 
   // Detect mobile on mount and resize
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
     };
@@ -50,63 +49,11 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch unread notification count
-  const { data: notifications } = useQuery({
-    queryKey: ['/api/notifications/unread', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from('in_app_notifications')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
-  });
-
-  useEffect(() => {
-    if (notifications) {
-      setUnreadCount(notifications.length);
-    }
-  }, [notifications]);
-
   // Fetch teacher profile for avatar photo
-  const { data: teacherProfile } = useQuery<Teacher>({
-    queryKey: ['/api/teacher-profile', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('profile_photo_url, full_name')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      return data as Teacher | null;
-    },
-    enabled: !!user?.id && role === 'teacher',
-  });
+  const { data: teacherProfile } = useTeacherProfile(user?.id);
 
   // Fetch school profile for logo
-  const { data: schoolProfile } = useQuery({
-    queryKey: ['/api/school-profile', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('schools')
-        .select('logo_url, school_name')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
-    },
-    enabled: !!user?.id && role === 'school',
-  });
+  const { data: schoolProfile } = useSchoolProfile(user?.id);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -167,21 +114,7 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
           {/* Right: Notifications, Settings, User */}
           <div className="flex items-center gap-2 ml-auto">
             {/* Notifications */}
-            <NotificationCenter>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative h-9 w-9"
-                aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
-              >
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center animate-pulse">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </Button>
-            </NotificationCenter>
+            <NotificationCenter className="h-9 w-9" />
 
             {/* Settings */}
             <Button
@@ -202,22 +135,22 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-9 gap-2 px-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage 
+                      <AvatarImage
                         src={
                           role === 'teacher' && teacherProfile?.profile_photo_url
                             ? teacherProfile.profile_photo_url
                             : role === 'school' && schoolProfile?.logo_url
-                            ? schoolProfile.logo_url
-                            : undefined
-                        } 
+                              ? schoolProfile.logo_url
+                              : undefined
+                        }
                       />
                       <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                         {getInitials(
                           role === 'teacher' && teacherProfile?.full_name
                             ? teacherProfile.full_name
                             : role === 'school' && schoolProfile?.school_name
-                            ? schoolProfile.school_name
-                            : user.user_metadata?.full_name || user.email || 'U'
+                              ? schoolProfile.school_name
+                              : user.user_metadata?.full_name || user.email || 'U'
                         )}
                       </AvatarFallback>
                     </Avatar>
@@ -225,8 +158,8 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                       {role === 'teacher' && teacherProfile?.full_name
                         ? teacherProfile.full_name.split(' ')[0]
                         : role === 'school' && schoolProfile?.school_name
-                        ? schoolProfile.school_name.split(' ')[0]
-                        : user.user_metadata?.full_name?.split(' ')[0] || 'User'}
+                          ? schoolProfile.school_name.split(' ')[0]
+                          : user.user_metadata?.full_name?.split(' ')[0] || 'User'}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -237,8 +170,8 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                         {role === 'teacher' && teacherProfile?.full_name
                           ? teacherProfile.full_name
                           : role === 'school' && schoolProfile?.school_name
-                          ? schoolProfile.school_name
-                          : user.user_metadata?.full_name || 'User'}
+                            ? schoolProfile.school_name
+                            : user.user_metadata?.full_name || 'User'}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {user.email}
@@ -262,7 +195,8 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                   <DropdownMenuItem
                     onClick={async () => {
                       await supabase.auth.signOut();
-                      setLocation('/login');
+                      // Force a full page reload to clear all state
+                      window.location.href = '/login';
                     }}
                     className="text-destructive"
                   >
@@ -298,4 +232,3 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
     </div>
   );
 }
-

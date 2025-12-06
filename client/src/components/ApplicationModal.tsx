@@ -82,10 +82,10 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
       let existing = null;
       try {
         const { data } = await supabase
-          .from('applications')
-          .select('id, status')
-          .eq('job_id', job.id)
-          .eq('teacher_id', userData.user.id)
+        .from('applications')
+        .select('id, status')
+        .eq('job_id', job.id)
+        .eq('teacher_id', userData.user.id)
           .maybeSingle()
           .abortSignal(checkController.signal);
         existing = data;
@@ -118,9 +118,9 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
         const { error } = await supabase
           .from('applications')
           .insert({
-            job_id: job.id,
-            teacher_id: userData.user.id,
-            cover_letter: finalCoverLetter,
+        job_id: job.id,
+        teacher_id: userData.user.id,
+        cover_letter: finalCoverLetter,
           })
           .abortSignal(insertController.signal);
         insertError = error;
@@ -147,14 +147,14 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
       const fetchTimeoutId = setTimeout(() => fetchController.abort(), 5000);
       
       try {
-        const { data: applicationData } = await supabase
-          .from('applications')
-          .select('id')
-          .eq('job_id', job.id)
-          .eq('teacher_id', userData.user.id)
+      const { data: applicationData } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('job_id', job.id)
+        .eq('teacher_id', userData.user.id)
           .single()
           .abortSignal(fetchController.signal);
-        applicationId = applicationData?.id || null;
+      applicationId = applicationData?.id || null;
         clearTimeout(fetchTimeoutId);
       } catch (fetchErr: any) {
         clearTimeout(fetchTimeoutId);
@@ -178,11 +178,11 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
           // Note: getOrCreateConversation doesn't support AbortController directly
           // We'll wrap it in a Promise.race with timeout
           const convPromise = getOrCreateConversation(
-            userData.user.id, // teacher_id
-            job.school_id,    // school_id
-            job.id           // job_id
-          );
-          
+          userData.user.id, // teacher_id
+          job.school_id,    // school_id
+          job.id           // job_id
+        );
+
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Conversation creation timeout')), 10000);
           });
@@ -209,9 +209,9 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
             await supabase
               .from('messages')
               .insert({
-                conversation_id: conversation.id,
-                sender_id: userData.user.id,
-                content: `Application submitted for ${job.title} at ${job.school_name}`,
+            conversation_id: conversation.id,
+            sender_id: userData.user.id,
+            content: `Application submitted for ${job.title} at ${job.school_name}`,
               })
               .abortSignal(msgController.signal);
             clearTimeout(msgTimeoutId);
@@ -231,10 +231,10 @@ export function ApplicationModal({ job, isOpen, onClose }: ApplicationModalProps
       if (applicationId) {
         // Don't await - fire and forget to prevent blocking
         notifyNewApplication(
-          job.school_id,
-          applicationId,
+            job.school_id,
+            applicationId,
           teacherProfile?.full_name || 'A teacher',
-          job.title
+            job.title
         ).catch((notifError) => {
           console.error('Error sending notification:', notifError);
         });

@@ -20,7 +20,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { AuthenticatedLayout } from '@/components/AuthenticatedLayout';
-import { Loader2, Mail, Bell, Shield, User, Camera, Trash2, Key, FileText } from 'lucide-react';
+import { Loader2, Mail, Bell, Shield, User, Camera, Trash2, Key, FileText, Sun, Moon } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 interface EmailPreferences {
   id: string;
@@ -40,10 +41,11 @@ export default function Settings() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [emailPreferences, setEmailPreferences] = useState<EmailPreferences | null>(null);
-  
+
   // Profile settings
   const [profileData, setProfileData] = useState({
     fullName: user?.user_metadata?.full_name || '',
@@ -51,7 +53,7 @@ export default function Settings() {
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  
+
   // Password change
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -59,7 +61,7 @@ export default function Settings() {
     confirmPassword: '',
   });
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  
+
   // Account deletion
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
@@ -393,6 +395,60 @@ export default function Settings() {
     }
   };
 
+  const handleDownloadData = async () => {
+    if (!user) return;
+
+    setSaving(true);
+    try {
+      // Fetch all user data from different tables
+      const [teacherData, schoolData, applicationsData, emailPrefsData] = await Promise.all([
+        supabase.from('teachers').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('schools').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('applications').select('*').eq('user_id', user.id),
+        supabase.from('user_email_preferences').select('*').eq('user_id', user.id).maybeSingle(),
+      ]);
+
+      // Compile user data
+      const userData = {
+        user: {
+          id: user.id,
+          email: user.email,
+          created_at: user.created_at,
+          user_metadata: user.user_metadata,
+        },
+        teacher_profile: teacherData.data,
+        school_profile: schoolData.data,
+        applications: applicationsData.data,
+        email_preferences: emailPrefsData.data,
+        exported_at: new Date().toISOString(),
+      };
+
+      // Create and download JSON file
+      const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `perfectmatch-data-${user.id}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Data downloaded',
+        description: 'Your data has been exported successfully.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Download failed',
+        description: error.message || 'Failed to download data.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -633,19 +689,100 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* Notifications Tab (Placeholder) */}
-          <TabsContent value="notifications">
+          {/* In-App Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>In-App Notifications</CardTitle>
                 <CardDescription>
-                  Manage your in-app notification preferences
+                  Control how you receive notifications within the app
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">
-                  In-app notification settings coming soon.
-                </p>
+              <CardContent className="space-y-6">
+                {/* Push Notifications */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="push-enabled" className="text-base font-semibold">
+                      Push Notifications
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Receive real-time notifications in your browser
+                    </p>
+                  </div>
+                  <Switch id="push-enabled" defaultChecked />
+                </div>
+
+                {/* Notification Types */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Notify me about:</h3>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="notif-messages">New Messages</Label>
+                      <p className="text-sm text-muted-foreground">
+                        When you receive a new message
+                      </p>
+                    </div>
+                    <Switch id="notif-messages" defaultChecked />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="notif-applications">Application Updates</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Changes to your job applications
+                      </p>
+                    </div>
+                    <Switch id="notif-applications" defaultChecked />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="notif-matches">New Matches</Label>
+                      <p className="text-sm text-muted-foreground">
+                        When new opportunities match your profile
+                      </p>
+                    </div>
+                    <Switch id="notif-matches" defaultChecked />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="notif-reminders">Reminders</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Deadlines and important dates
+                      </p>
+                    </div>
+                    <Switch id="notif-reminders" defaultChecked />
+                  </div>
+                </div>
+
+                {/* Notification Sound */}
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="sound-enabled" className="text-base font-semibold">
+                      Sound Effects
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Play a sound when you receive notifications
+                    </p>
+                  </div>
+                  <Switch id="sound-enabled" defaultChecked />
+                </div>
+
+                {/* Save Button */}
+                <div className="flex justify-end pt-4 border-t">
+                  <Button disabled={saving}>
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Preferences'
+                    )}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -728,6 +865,50 @@ export default function Settings() {
                     'Save Profile'
                   )}
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* Theme Preferences */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Appearance</CardTitle>
+                <CardDescription>
+                  Customize how the app looks on your device
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Theme</Label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <Button
+                      variant={theme === 'light' ? 'default' : 'outline'}
+                      onClick={() => setTheme('light')}
+                      className="gap-2"
+                    >
+                      <Sun className="h-4 w-4" />
+                      Light
+                    </Button>
+                    <Button
+                      variant={theme === 'dark' ? 'default' : 'outline'}
+                      onClick={() => setTheme('dark')}
+                      className="gap-2"
+                    >
+                      <Moon className="h-4 w-4" />
+                      Dark
+                    </Button>
+                    <Button
+                      variant={theme === 'system' ? 'default' : 'outline'}
+                      onClick={() => setTheme('system')}
+                      className="gap-2"
+                    >
+                      <Shield className="h-4 w-4" />
+                      System
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Choose your preferred color scheme. System will match your device settings.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -846,9 +1027,24 @@ export default function Settings() {
                     We respect your privacy. Your data is encrypted and stored securely.
                     You can request a copy of your data or delete your account at any time.
                   </p>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <FileText className="h-4 w-4" />
-                    Download My Data
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={handleDownloadData}
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Preparing...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4" />
+                        Download My Data
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>

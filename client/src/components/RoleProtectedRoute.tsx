@@ -2,6 +2,8 @@ import { ReactNode, useEffect, useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
+import { useTeacherProfile } from '@/hooks/useTeacherProfile';
+import { useSchoolProfile } from '@/hooks/useSchoolProfile';
 
 // Timeout for profile check (5 seconds) - if exceeded, assume profile is complete
 const PROFILE_CHECK_TIMEOUT_MS = 5000;
@@ -18,105 +20,61 @@ export function RoleProtectedRoute({ children, allowedRole }: RoleProtectedRoute
   const [profileComplete, setProfileComplete] = useState(false);
   const checkCompleted = useRef(false);
 
+  // Use hooks for cached data
+  const { data: teacherProfile, isLoading: teacherLoading } = useTeacherProfile(user?.id);
+  const { data: schoolProfile, isLoading: schoolLoading } = useSchoolProfile(user?.id);
+
   useEffect(() => {
     let isMounted = true;
 
     // Safety timeout - if profile check takes too long, proceed anyway
-    // This prevents getting stuck on "Loading..." in PWA/offline mode
     const timeoutId = setTimeout(() => {
       if (!checkCompleted.current && isMounted) {
         console.warn('[RoleProtectedRoute] Profile check timed out - proceeding with current state');
         checkCompleted.current = true;
-        setProfileComplete(true); // Assume complete if we can't check
+        setProfileComplete(true);
         setProfileChecked(true);
       }
     }, PROFILE_CHECK_TIMEOUT_MS);
 
-    async function checkProfile() {
+    const checkProfile = () => {
       if (authLoading || !user) return;
       if (!isMounted || checkCompleted.current) return;
 
-      // If role doesn't match, redirect to dashboard (which will redirect to correct dashboard)
-      if (!role) {
+      // If role doesn't match, redirect to dashboard
+      if (!role || role !== allowedRole) {
         checkCompleted.current = true;
         setProfileChecked(true);
         setLocation('/dashboard');
         return;
       }
 
-      if (role !== allowedRole) {
-        checkCompleted.current = true;
-        setProfileChecked(true);
-        setLocation('/dashboard');
-        return;
-      }
+      // Check based on role
+      if (allowedRole === 'teacher') {
+        if (teacherLoading) return; // Wait for data
 
-      try {
-        if (allowedRole === 'teacher') {
-          const { data, error } = await supabase
-            .from('teachers')
-            .select('profile_complete, archetype')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (!isMounted || checkCompleted.current) return;
-
-          if (error) {
-            console.error('Error fetching teacher profile:', error);
-            // On error, assume profile is complete to avoid blocking user
-            checkCompleted.current = true;
-            setProfileComplete(true);
-            setProfileChecked(true);
-            return;
-          }
-
-          if (!data || !data.profile_complete || !data.archetype) {
-            checkCompleted.current = true;
-            setProfileChecked(true);
-            setLocation('/onboarding/teacher');
-            return;
-          }
+        if (!teacherProfile || !teacherProfile.profile_complete || !teacherProfile.archetype) {
           checkCompleted.current = true;
-          setProfileComplete(true);
           setProfileChecked(true);
-        } else if (allowedRole === 'school') {
-          const { data, error } = await supabase
-            .from('schools')
-            .select('profile_complete')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (!isMounted || checkCompleted.current) return;
-
-          if (error) {
-            console.error('Error fetching school profile:', error);
-            // On error, assume profile is complete to avoid blocking user
-            checkCompleted.current = true;
-            setProfileComplete(true);
-            setProfileChecked(true);
-            return;
-          }
-
-          if (!data || !data.profile_complete) {
-            checkCompleted.current = true;
-            setProfileChecked(true);
-            setLocation('/onboarding/school');
-            return;
-          }
-          checkCompleted.current = true;
-          setProfileComplete(true);
-          setProfileChecked(true);
+          setLocation('/onboarding/teacher');
+          return;
         }
-      } catch (error) {
-        console.error('Error checking profile:', error);
-        if (isMounted && !checkCompleted.current) {
-          // On error, assume profile is complete to avoid blocking user
+      } else if (allowedRole === 'school') {
+        if (schoolLoading) return; // Wait for data
+
+        if (!schoolProfile || !schoolProfile.profile_complete) {
           checkCompleted.current = true;
-          setProfileComplete(true);
           setProfileChecked(true);
+          setLocation('/onboarding/school');
+          return;
         }
       }
-    }
+
+      // If we got here, profile is complete
+      checkCompleted.current = true;
+      setProfileComplete(true);
+      setProfileChecked(true);
+    };
 
     if (!authLoading) {
       if (!user) {
@@ -131,7 +89,17 @@ export function RoleProtectedRoute({ children, allowedRole }: RoleProtectedRoute
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [user, role, authLoading, allowedRole, setLocation]);
+  }, [
+    user,
+    role,
+    authLoading,
+    allowedRole,
+    setLocation,
+    teacherProfile,
+    schoolProfile,
+    teacherLoading,
+    schoolLoading
+  ]);
 
   // Show loading only briefly while checking auth
   if (authLoading) {

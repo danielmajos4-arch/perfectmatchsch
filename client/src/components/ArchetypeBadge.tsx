@@ -71,7 +71,7 @@ export function ArchetypeBadge({ teacher, showAnimation = false }: ArchetypeBadg
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
           <div className={`p-2.5 ${colors.iconBg} rounded-lg`}>
             <Award className={`h-5 w-5 ${colors.text}`} />
           </div>
@@ -79,29 +79,29 @@ export function ArchetypeBadge({ teacher, showAnimation = false }: ArchetypeBadg
             <h3 className={`text-xl font-bold ${colors.text} mb-2`}>
               {teacher.archetype}
             </h3>
-            {teacher.archetype_tags && teacher.archetype_tags.length > 0 && (
+          {teacher.archetype_tags && teacher.archetype_tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {teacher.archetype_tags.slice(0, 3).map((tag) => (
+              {teacher.archetype_tags.slice(0, 3).map((tag) => (
                   <Badge 
                     key={tag} 
                     variant="secondary" 
                     className={`text-xs rounded-md ${colors.iconBg} ${colors.text} border-0`}
                   >
-                    {tag}
-                  </Badge>
-                ))}
-                {teacher.archetype_tags.length > 3 && (
+                  {tag}
+                </Badge>
+              ))}
+              {teacher.archetype_tags.length > 3 && (
                   <Badge 
                     variant="secondary" 
                     className={`text-xs rounded-md ${colors.iconBg} ${colors.text} border-0`}
                   >
                     +{teacher.archetype_tags.length - 3}
-                  </Badge>
-                )}
-              </div>
-            )}
-          </div>
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
+      </div>
       </CardContent>
     </Card>
   );

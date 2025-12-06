@@ -11,6 +11,7 @@ import { ArchetypeResults } from '@/components/onboarding/ArchetypeResults';
 import { supabase } from '@/lib/supabaseClient';
 import { QuizWithOptions, UserArchetype, InsertTeacher, Teacher } from '@shared/schema';
 import { queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 const logoUrl = '/images/logo.png';
 import { getMissingFields, isProfileComplete, calculateProfileCompletion, TeacherProfile as CompletionProfile } from '@/lib/profileUtils';
 
@@ -29,11 +30,11 @@ interface ProfileFormData {
   full_name: string;
   phone: string;
   location: string;
-  bio: string;
+  bio?: string | null;
   years_experience: string;
   subjects: string[];
   grade_levels: string[];
-  teaching_philosophy: string;
+  teaching_philosophy?: string | null;
   certifications?: string[];
 }
 
@@ -46,6 +47,7 @@ const normalizeYearsExperience = (value?: string | null) => {
 export default function TeacherOnboarding() {
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('profile');
   const [profileData, setProfileData] = useState<ProfileFormData | null>(null);
   const [archetypeData, setArchetypeData] = useState<UserArchetype | null>(null);
@@ -62,20 +64,60 @@ export default function TeacherOnboarding() {
     };
   }, []);
 
+  // Email verification guard - redirect if email not verified
+  useEffect(() => {
+    if (user && !user.email_confirmed_at) {
+      console.log('[TeacherOnboarding] Email not verified, redirecting to verification page');
+      window.history.replaceState({ usr: { email: user.email } }, '', '/verify-email');
+      setLocation('/verify-email');
+    }
+  }, [user, setLocation]);
+
   const { data: teacherProfile, isLoading: teacherProfileLoading } = useQuery<Teacher | null>({
     queryKey: ['teacher-onboarding-profile', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
+
+      console.log('[TeacherOnboarding] Fetching profile for user:', user.id);
+
       const { data, error } = await supabase
         .from('teachers')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          full_name,
+          email,
+          phone,
+          location,
+          bio,
+          years_experience,
+          subjects,
+          grade_levels,
+          teaching_philosophy,
+          certifications,
+          archetype,
+          quiz_result,
+          profile_complete,
+          profile_photo_url,
+          resume_url,
+          portfolio_url,
+          created_at,
+          updated_at
+        `)
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== 'PGRST116') {
+        console.error('[TeacherOnboarding] Profile fetch error:', error);
+        throw error;
+      }
+
+      console.log('[TeacherOnboarding] Profile loaded:', data ? 'Found' : 'Not found');
       return data as Teacher | null;
     },
     enabled: !!user?.id,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const isTeacher = user?.user_metadata?.role === 'teacher';
@@ -102,15 +144,15 @@ export default function TeacherOnboarding() {
   useEffect(() => {
     // Don't run if component is unmounted or we're transitioning
     if (!isMountedRef.current || isTransitioningRef.current) return;
-    
+
     // Only redirect if:
     // 1. Profile is complete
     // 2. We're not on results step (we want to show results first)
     // 3. We're not already on dashboard
     // 4. We're not currently on quiz step (let quiz complete first)
     if (
-      teacherProfile?.profile_complete && 
-      currentStep !== 'results' && 
+      teacherProfile?.profile_complete &&
+      currentStep !== 'results' &&
       currentStep !== 'quiz' &&
       location !== '/teacher/dashboard'
     ) {
@@ -147,19 +189,19 @@ export default function TeacherOnboarding() {
     queryKey: ['quiz-questions'],
     queryFn: async () => {
       console.log('=== QUIZ DATA LOAD DEBUG START ===');
-      
+
       // Try quiz_with_options view first
       let data, error;
-      
+
       try {
         const result = await supabase
-        .from('quiz_with_options')
-        .select('*')
-        .order('question_order');
+          .from('quiz_with_options')
+          .select('*')
+          .order('question_order');
 
         data = result.data;
         error = result.error;
-        
+
         console.log('1. quiz_with_options view result:', {
           hasData: !!data,
           dataLength: data?.length || 0,
@@ -173,22 +215,22 @@ export default function TeacherOnboarding() {
           .from('archetype_quiz_questions')
           .select('*')
           .order('question_order');
-        
+
         const optionsResult = await supabase
           .from('archetype_quiz_options')
           .select('*');
-        
+
         console.log('1b. Direct table queries:', {
           questions: questionsResult.data?.length || 0,
           options: optionsResult.data?.length || 0,
           questionsError: questionsResult.error,
           optionsError: optionsResult.error
         });
-        
+
         if (questionsResult.error || optionsResult.error) {
           throw questionsResult.error || optionsResult.error;
         }
-        
+
         // Group manually
         const grouped = (questionsResult.data || []).map((q: any) => ({
           question_id: q.question_id,
@@ -203,12 +245,12 @@ export default function TeacherOnboarding() {
               scores: opt.scores
             }))
         }));
-        
+
         console.log('1c. Grouped data:', {
           questionsCount: grouped.length,
           optionsPerQuestion: grouped.map(q => q.options.length)
         });
-        
+
         return grouped.sort((a, b) => a.question_order - b.question_order);
       }
 
@@ -228,7 +270,7 @@ export default function TeacherOnboarding() {
       const groupedQuestions = data.reduce((acc: any[], row: any) => {
         // Find if this question already exists in our accumulator
         let existingQuestion = acc.find(q => q.question_id === row.question_id);
-        
+
         // Create option object from row data
         const option = {
           id: row.option_id || row.id,
@@ -263,7 +305,7 @@ export default function TeacherOnboarding() {
       }, []);
 
       const sorted = groupedQuestions.sort((a, b) => a.question_order - b.question_order);
-      
+
       console.log('2b. Grouped and sorted quiz data:', {
         questionsCount: sorted.length,
         questionsWithOptions: sorted.map(q => ({
@@ -271,8 +313,8 @@ export default function TeacherOnboarding() {
           question: q.question?.substring(0, 50) + '...',
           question_order: q.question_order,
           optionsCount: q.options?.length || 0,
-          options: q.options?.map((o: any) => ({ 
-            id: o.id, 
+          options: q.options?.map((o: any) => ({
+            id: o.id,
             text: o.text?.substring(0, 40) + '...',
             hasScores: !!o.scores
           }))
@@ -296,9 +338,9 @@ export default function TeacherOnboarding() {
           optionsCount: q.options.length
         })));
       }
-      
+
       console.log('=== QUIZ DATA LOAD DEBUG END ===');
-      
+
       return sorted;
     },
   });
@@ -346,33 +388,32 @@ export default function TeacherOnboarding() {
   }, [onboardingComplete, getCompletionPayload]);
 
   const saveProfileMutation = useMutation({
+    retry: 1,
+    retryDelay: 1000,
     mutationFn: async (data: any) => {
-      console.log('=== PROFILE SAVE DEBUG START ===');
+      console.log('[SAVE] ========================================');
+      console.log('[SAVE] Step 1: Starting mutation');
+      console.log('[SAVE] Input data:', data);
+      console.log('[SAVE] ========================================');
 
       try {
-        // 1. Check if user is authenticated
-        const { data: { user: authUser }, error: userError } = await supabase.auth.getUser();
-        console.log('1. Auth User:', {
-          exists: !!authUser,
-          userId: authUser?.id,
-          email: authUser?.email,
-          error: userError,
-          contextUser: user ? { id: user.id, email: user.email } : null
-        });
-
+        // 1. Check if user is authenticated (use AuthContext user directly)
+        console.log('[SAVE] Step 2: Checking user from AuthContext...');
         if (!user) {
-          console.error('1. ERROR: No user found in context');
-          throw new Error('No user found');
+          console.error('[SAVE] ERROR: No user found in AuthContext');
+          throw new Error('No user found. Please log in again.');
         }
+        console.log('[SAVE] Step 3: User authenticated:', { userId: user.id, email: user.email });
 
         // 2. First check if user exists in users table (required for foreign key)
+        console.log('[SAVE] Step 5: Checking user record in users table...');
         const { data: userRecord, error: userRecordError } = await supabase
           .from('users')
           .select('id, email, role')
           .eq('id', user.id)
           .maybeSingle();
 
-        console.log('2a. User Record Check (users table):', {
+        console.log('[SAVE] Step 6: User record check result:', {
           exists: !!userRecord,
           data: userRecord,
           error: userRecordError,
@@ -386,7 +427,7 @@ export default function TeacherOnboarding() {
 
         // If user doesn't exist in users table, create it
         if (!userRecord && !userRecordError) {
-          console.log('2b. User record not found, creating it...');
+          console.log('[SAVE] Step 7: User record not found, creating it...');
           const { data: newUserRecord, error: createUserError } = await supabase
             .from('users')
             .insert([{
@@ -398,7 +439,7 @@ export default function TeacherOnboarding() {
             .select()
             .single();
 
-          console.log('2b. Create User Result:', {
+          console.log('[SAVE] Step 8: User creation result:', {
             success: !!newUserRecord,
             data: newUserRecord,
             error: createUserError,
@@ -411,19 +452,23 @@ export default function TeacherOnboarding() {
           });
 
           if (createUserError) {
-            console.error('Failed to create user record:', createUserError);
+            console.error('[SAVE] ERROR at Step 8: Failed to create user record:', createUserError);
             throw new Error(`Failed to create user record: ${createUserError.message}`);
           }
+          console.log('[SAVE] Step 9: User record created successfully');
+        } else {
+          console.log('[SAVE] Step 7: User record already exists, skipping creation');
         }
 
         // 3. Check if teacher record exists
+        console.log('[SAVE] Step 10: Checking for existing teacher record...');
         const { data: existingTeacher, error: checkError } = await supabase
           .from('teachers')
           .select('id, user_id')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        console.log('2c. Existing Teacher Record:', {
+        console.log('[SAVE] Step 11: Teacher record check result:', {
           exists: !!existingTeacher,
           data: existingTeacher,
           error: checkError,
@@ -436,41 +481,53 @@ export default function TeacherOnboarding() {
         });
 
         // 4. Prepare data to save
-      const teacherData: InsertTeacher = {
-        user_id: user.id,
-        full_name: data.full_name,
-        email: user.email || '',
-        phone: data.phone,
-        location: data.location,
-        bio: data.bio || null,
-        years_experience: data.years_experience,
-        subjects: data.subjects,
-        grade_levels: data.grade_levels,
-        teaching_philosophy: data.teaching_philosophy || null,
-        certifications: data.certifications || teacherProfile?.certifications || [],
-        profile_complete: false,
-      };
+        console.log('[SAVE] Step 12: Preparing teacher data...');
+        const teacherData: InsertTeacher = {
+          user_id: user.id,
+          full_name: data.full_name,
+          email: user.email || '',
+          phone: data.phone,
+          location: data.location,
+          bio: data.bio || null,
+          years_experience: data.years_experience,
+          subjects: data.subjects,
+          grade_levels: data.grade_levels,
+          teaching_philosophy: data.teaching_philosophy || null,
+          certifications: data.certifications || teacherProfile?.certifications || [],
+          profile_complete: false,
+        };
 
-        console.log('3. Attempting to save with user_id:', user.id);
-        console.log('4. Data to save:', {
-          ...teacherData,
+        console.log('[SAVE] Step 13: Teacher data prepared:', {
+          user_id: teacherData.user_id,
+          full_name: teacherData.full_name,
+          email: teacherData.email,
+          phone: teacherData.phone,
+          location: teacherData.location,
+          bio_length: teacherData.bio?.length || 0,
+          years_experience: teacherData.years_experience,
+          subjects_count: teacherData.subjects?.length || 0,
           subjects: teacherData.subjects,
-          grade_levels: teacherData.grade_levels
+          grade_levels_count: teacherData.grade_levels?.length || 0,
+          grade_levels: teacherData.grade_levels,
+          certifications_count: teacherData.certifications?.length || 0,
+          profile_complete: teacherData.profile_complete
         });
 
         // 5. Use UPSERT to handle both insert and update in one operation
-        // This avoids race conditions and handles the UNIQUE constraint properly
-        console.log('5. Upserting teacher record (insert or update)...');
+        console.log('[SAVE] Step 14: Starting UPSERT operation...');
+        console.log('[SAVE] Step 14a: About to call supabase.from("teachers").upsert()...');
+
         const { data: upsertedData, error: upsertError } = await supabase
-        .from('teachers')
+          .from('teachers')
           .upsert(teacherData, {
             onConflict: 'user_id',
             ignoreDuplicates: false
           })
           .select()
-        .single();
+          .single();
 
-        console.log('5. Upsert Result:', {
+        console.log('[SAVE] Step 15: UPSERT completed, processing result...');
+        console.log('[SAVE] Step 16: Upsert result:', {
           success: !!upsertedData,
           data: upsertedData,
           error: upsertError,
@@ -484,50 +541,62 @@ export default function TeacherOnboarding() {
 
         if (upsertError) {
           // If upsert fails, try separate insert/update as fallback
-          console.log('5b. Upsert failed, trying fallback insert/update...');
+          console.log('[SAVE] Step 17: UPSERT failed, trying fallback insert/update...');
 
-      if (existingTeacher) {
-            console.log('5b. Fallback: Updating existing teacher record...');
+          if (existingTeacher) {
+            console.log('[SAVE] Step 18: Fallback - Updating existing teacher record...');
             const { data: updatedData, error: updateError } = await supabase
-          .from('teachers')
-          .update(teacherData)
+              .from('teachers')
+              .update(teacherData)
               .eq('user_id', user.id)
               .select()
               .single();
 
-            console.log('5b. Fallback Update Result:', {
+            console.log('[SAVE] Step 19: Fallback update result:', {
               success: !!updatedData,
               data: updatedData,
               error: updateError
             });
 
-            if (updateError) throw updateError;
-      } else {
-            console.log('5b. Fallback: Inserting new teacher record...');
+            if (updateError) {
+              console.error('[SAVE] ERROR at Step 19: Fallback update failed:', updateError);
+              throw updateError;
+            }
+            console.log('[SAVE] Step 20: Fallback update succeeded');
+          } else {
+            console.log('[SAVE] Step 18: Fallback - Inserting new teacher record...');
             const { data: insertedData, error: insertError } = await supabase
               .from('teachers')
               .insert(teacherData)
               .select()
               .single();
 
-            console.log('5b. Fallback Insert Result:', {
+            console.log('[SAVE] Step 19: Fallback insert result:', {
               success: !!insertedData,
               data: insertedData,
               error: insertError
             });
 
-            if (insertError) throw insertError;
+            if (insertError) {
+              console.error('[SAVE] ERROR at Step 19: Fallback insert failed:', insertError);
+              throw insertError;
+            }
+            console.log('[SAVE] Step 20: Fallback insert succeeded');
           }
+        } else {
+          console.log('[SAVE] Step 17: UPSERT succeeded, no fallback needed');
         }
 
         // 6. Verify the save worked - FINAL DATABASE CHECK
+        console.log('[SAVE] Step 21: Starting final database verification...');
         const { data: verifyTeacher, error: verifyError } = await supabase
           .from('teachers')
           .select('id, user_id, full_name, email, phone, location, subjects, grade_levels, profile_complete, created_at')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        console.log('6. Final Database Verification:', {
+        console.log('[SAVE] Step 22: Verification query completed');
+        console.log('[SAVE] Step 23: Final verification result:', {
           exists: !!verifyTeacher,
           data: verifyTeacher,
           error: verifyError,
@@ -537,11 +606,13 @@ export default function TeacherOnboarding() {
         });
 
         if (!verifyTeacher) {
+          console.error('[SAVE] ERROR at Step 23: Verification failed - no teacher record found');
           throw new Error('CRITICAL: Profile save verification failed - record not found in database after save operation');
-      }
+        }
 
-        console.log('✅ PROFILE CONFIRMED SAVED TO DATABASE');
-        console.log('✅ Saved Data:', {
+        console.log('[SAVE] Step 24: Verification successful!');
+        console.log('[SAVE] ✅ PROFILE CONFIRMED SAVED TO DATABASE');
+        console.log('[SAVE] ✅ Saved Data:', {
           id: verifyTeacher.id,
           user_id: verifyTeacher.user_id,
           full_name: verifyTeacher.full_name,
@@ -554,12 +625,16 @@ export default function TeacherOnboarding() {
           created_at: verifyTeacher.created_at
         });
 
-        console.log('=== PROFILE SAVE DEBUG END: SUCCESS ===');
-      return teacherData;
+        console.log('[SAVE] Step 25: Preparing to return data');
+        console.log('[SAVE] ========================================');
+        console.log('[SAVE] SUCCESS - Returning teacher data');
+        console.log('[SAVE] ========================================');
+        return teacherData;
 
       } catch (error: any) {
-        console.error('=== PROFILE SAVE DEBUG END: FAILED ===');
-        console.error('Error details:', {
+        console.error('[SAVE] ========================================');
+        console.error('[SAVE] EXCEPTION CAUGHT IN TRY/CATCH');
+        console.error('[SAVE] Error details:', {
           message: error.message,
           code: error.code,
           details: error.details,
@@ -567,73 +642,61 @@ export default function TeacherOnboarding() {
           fullError: error,
           stack: error.stack
         });
+        console.error('[SAVE] ========================================');
         throw error;
       }
     },
     onSuccess: async (data) => {
-      // Verify the save actually worked
-      console.log('=== PROFILE SAVE SUCCESS - VERIFYING ===');
-      
-      if (user?.id) {
-        // Import verification function
-        const { verifyProfileSave } = await import('@/utils/verifyProfileSave');
-        const verification = await verifyProfileSave(user.id, {
-          full_name: data.full_name,
-          email: data.email,
-          phone: data.phone,
-          location: data.location
+      console.log('=== PROFILE SAVE SUCCESS ===');
+      console.log('Saved data:', data);
+
+      // Always set profile data and transition to quiz
+      if (isMountedRef.current) {
+        setProfileData({
+          ...data,
+          certifications: data.certifications || teacherProfile?.certifications || [],
         });
 
-        if (verification.success) {
-          console.log('✅ Profile verified and saved successfully!');
-          if (isMountedRef.current) {
-            setProfileData({
-              ...data,
-              certifications: data.certifications || teacherProfile?.certifications || [],
-            });
-            setCurrentStep('quiz');
-            setError('');
-          }
-        } else {
-          console.error('❌ Profile save verification failed:', verification.errors);
-          if (isMountedRef.current) {
-            setError(`Profile saved but verification failed: ${verification.errors.join(', ')}`);
-            // Still proceed to quiz, but log the issue
-            setProfileData({
-              ...data,
-              certifications: data.certifications || teacherProfile?.certifications || [],
-            });
-            setCurrentStep('quiz');
-          }
-        }
-        // Delay query invalidation to avoid triggering re-renders during transition
+        console.log('✅ Transitioning to quiz step...');
+        setCurrentStep('quiz');
+        setError('');
+      }
+
+      // Invalidate queries after state update
+      if (user?.id) {
         setTimeout(() => {
           if (isMountedRef.current && user?.id) {
             queryClient.invalidateQueries({ queryKey: ['teacher-onboarding-profile', user.id] });
           }
         }, 50);
-      } else {
-        // Fallback if no user
-        if (isMountedRef.current) {
-          setProfileData({
-            ...data,
-            certifications: data.certifications || teacherProfile?.certifications || [],
-          });
-          setCurrentStep('quiz');
-          setError('');
-        }
       }
+
+      console.log('=== PROFILE SAVE SUCCESS - COMPLETE ===');
     },
     onError: (error: any) => {
-      console.error('Error saving profile:', error);
-      setError('Failed to save profile. Please try again.');
+      console.error('=== PROFILE SAVE ERROR ===', error);
+
+      // Show user-friendly error
+      const errorMessage = error?.message || 'Failed to save profile';
+      setError(`Unable to save profile: ${errorMessage}. Please check your connection and try again.`);
+
+      // Still try to proceed if we have the data client-side
+      // This prevents users from getting permanently stuck
+      if (profileData) {
+        console.log('⚠️ Attempting to proceed with cached profile data');
+        toast({
+          title: 'Warning',
+          description: 'Profile may not be fully saved. You can continue the quiz and we\'ll save your data later.',
+          variant: 'destructive',
+        });
+      }
     },
   });
 
   const submitQuizMutation = useMutation({
     mutationFn: async (answers: Record<string, string>) => {
       console.log('=== QUIZ SUBMISSION DEBUG START ===');
-      
+
       if (!user || !quizData) {
         console.error('Missing required data:', { user: !!user, quizData: !!quizData });
         throw new Error('Missing required data');
@@ -679,9 +742,9 @@ export default function TeacherOnboarding() {
           }
           return keyA.localeCompare(keyB); // Alphabetical tiebreaker
         });
-      
+
       const topArchetype = sortedArchetypes[0][0];
-      
+
       console.log('3b. Sorted archetypes (with tiebreaker):', sortedArchetypes);
 
       const finalArchetypeName = ARCHETYPE_MAPPING[topArchetype] || topArchetype;
@@ -756,8 +819,7 @@ export default function TeacherOnboarding() {
           .from('user_archetypes')
           .select('*')
           .eq('archetype_name', finalArchetypeName)
-          .maybeSingle()
-          .abortSignal(fetchController.signal);
+          .maybeSingle();
 
         clearTimeout(fetchTimeoutId);
 
@@ -795,20 +857,20 @@ export default function TeacherOnboarding() {
     },
     onSuccess: (data) => {
       console.log('7. onSuccess called with data:', data?.archetype_name);
-      
+
       // Guard against updates after unmount
       if (!isMountedRef.current) {
         console.warn('7. Component unmounted, skipping state update');
         return;
       }
-      
+
       // Set transitioning flag to prevent useEffect from interfering
       isTransitioningRef.current = true;
-      
+
       setArchetypeData(data);
       setCurrentStep('results');
       setError('');
-      
+
       // Delay query invalidation to avoid triggering re-renders during transition
       // Use setTimeout to let the state update complete first
       setTimeout(() => {
@@ -823,7 +885,7 @@ export default function TeacherOnboarding() {
           }, 100);
         }
       }, 50);
-      
+
       console.log('7b. State updated - should now show results step');
     },
     onError: (error: any) => {
@@ -833,6 +895,19 @@ export default function TeacherOnboarding() {
   });
 
   const handleProfileSubmit = useCallback((data: ProfileFormData) => {
+    // TEMPORARILY DISABLED - was causing legitimate saves to be blocked
+    // The isPending check is too aggressive and blocks the first save attempt
+    // if (saveProfileMutation.isPending) {
+    //   console.log('[TeacherOnboarding] Save already in progress, ignoring duplicate call');
+    //   return;
+    // }
+
+    console.log('[TeacherOnboarding] ========================================');
+    console.log('[TeacherOnboarding] STARTING PROFILE SAVE');
+    console.log('[TeacherOnboarding] Profile data:', data);
+    console.log('[TeacherOnboarding] isPending:', saveProfileMutation.isPending);
+    console.log('[TeacherOnboarding] ========================================');
+
     saveProfileMutation.mutate({
       ...data,
       certifications: data.certifications || teacherProfile?.certifications || [],
@@ -889,7 +964,7 @@ export default function TeacherOnboarding() {
     // Allow users to proceed even if profile isn't 100% complete
     // Photo and resume can be added later from dashboard
     if (completeOnboardingMutation.isPending) return;
-    
+
     // If profile is complete, mark it as complete
     // Otherwise, just redirect to dashboard (profile_complete stays false)
     const payload = getCompletionPayload();
@@ -936,7 +1011,7 @@ export default function TeacherOnboarding() {
             <span className="font-semibold text-primary">{Math.round(progressPercentage)}%</span>
           </div>
           <div className="w-full bg-muted rounded-full h-2.5 sm:h-3 overflow-hidden shadow-inner">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] transition-all duration-500 ease-out rounded-full shadow-sm"
               style={{ width: `${progressPercentage}%` }}
             />
@@ -950,11 +1025,11 @@ export default function TeacherOnboarding() {
 
         <div className="text-center space-y-3">
           <div className="flex justify-center mb-6">
-            <img 
-              src={logoUrl} 
-              alt="PerfectMatchSchools" 
-              className="h-28 w-auto drop-shadow-2xl" 
-              style={{ 
+            <img
+              src={logoUrl}
+              alt="PerfectMatchSchools"
+              className="h-28 w-auto drop-shadow-2xl"
+              style={{
                 filter: 'drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2)) brightness(1.35) contrast(1.55) saturate(2.1)',
                 transform: 'scale(1.08)'
               }}
@@ -994,7 +1069,12 @@ export default function TeacherOnboarding() {
             {currentStep === 'profile' && (
               <TeacherProfileStep
                 onNext={handleProfileSubmit}
-                initialData={profileData || undefined}
+                initialData={profileData ? {
+                  ...profileData,
+                  bio: profileData.bio ?? undefined,
+                  teaching_philosophy: profileData.teaching_philosophy ?? undefined
+                } : undefined}
+                isLoading={saveProfileMutation.isPending}
               />
             )}
 

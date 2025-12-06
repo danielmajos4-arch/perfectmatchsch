@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Link, useLocation } from 'wouter';
 import { AuthenticatedLayout } from '@/components/AuthenticatedLayout';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CandidatePipelineView } from '@/components/CandidatePipelineView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,6 +19,7 @@ import { Briefcase, Users, Plus, Edit, Trash2, Eye, X, CheckCircle, Clock, Searc
 import { supabase } from '@/lib/supabaseClient';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { notifyJobPostedToTeachers } from '@/lib/notificationService';
 import { findMatchingTeachers } from '@/lib/jobMatchingService';
 import { getOrCreateConversation } from '@/lib/conversationService';
@@ -26,6 +28,10 @@ import { AchievementNotification } from '@/components/achievements';
 import { AchievementCollection } from '@/components/achievements';
 import { useAchievements } from '@/hooks/useAchievements';
 import { EmptyState } from '@/components/EmptyState';
+import { JobPostingWizard, type JobPostingFormData } from '@/components/JobPostingWizard';
+import { OffersTable } from '@/components/OffersTable';
+import { SchoolAnalyticsDashboard } from '@/components/SchoolAnalyticsDashboard';
+import { getOffersBySchool, getOfferStatusInfo } from '@/lib/offerService';
 import type { Job, Application } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -46,6 +52,7 @@ interface FormData {
   archetype_tags: string[];
   start_date?: string;
   application_deadline?: string;
+  application_requirements?: Record<string, boolean>;
 }
 
 const DEPARTMENTS = [
@@ -94,18 +101,21 @@ const ARCHETYPES = [
   'The Leader'
 ];
 
+import { ManualCandidateModal } from '@/components/ManualCandidateModal';
+
 export default function SchoolDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { achievements, newAchievement, dismissNotification } = useAchievements();
   const [showJobModal, setShowJobModal] = useState(false);
+  const [showManualCandidateModal, setShowManualCandidateModal] = useState(false);
   const [activeTab, setActiveTab] = useState('jobs');
   const [editingJob, setEditingJob] = useState<JobWithApplications | null>(null);
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
   const [jobSearchQuery, setJobSearchQuery] = useState('');
   const [jobFilterDepartment, setJobFilterDepartment] = useState<string>('all');
   const [jobFilterStatus, setJobFilterStatus] = useState<string>('all');
-  
+
   // Handle hash routes
   useEffect(() => {
     const hash = window.location.hash;
@@ -138,15 +148,47 @@ export default function SchoolDashboard() {
     archetype_tags: [],
     start_date: '',
     application_deadline: '',
-  });
-
-  const { data: user } = useQuery({
-    queryKey: ['/api/auth/user'],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      return data.user;
+    application_requirements: {
+      resume: true,
+      cover_letter: false,
+      desired_salary: false,
+      linkedin_url: false,
+      date_available: false,
+      website_portfolio: false,
     },
   });
+
+  // Use user from AuthContext instead of query - more reliable, especially when offline
+  const { user, loading: authLoading } = useAuth();
+
+  // Check school approval status
+  const { data: schoolProfile } = useQuery({
+    queryKey: ['/api/school-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+
+      const { data, error } = await supabase
+        .from('schools')
+        .select('id, approval_status, school_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching school profile:', error);
+        return null;
+      }
+
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Redirect to pending approval page if not approved
+  useEffect(() => {
+    if (schoolProfile && schoolProfile.approval_status === 'pending') {
+      setLocation('/school/pending-approval');
+    }
+  }, [schoolProfile, setLocation]);
 
   // Fetch jobs with applications
   const { data: jobs, isLoading: jobsLoading } = useQuery<JobWithApplications[]>({
@@ -264,13 +306,13 @@ export default function SchoolDashboard() {
     if (!jobs) return [];
 
     return jobs.filter(job => {
-      const matchesSearch = !jobSearchQuery || 
+      const matchesSearch = !jobSearchQuery ||
         job.title.toLowerCase().includes(jobSearchQuery.toLowerCase()) ||
         job.location.toLowerCase().includes(jobSearchQuery.toLowerCase());
-      
+
       const matchesDepartment = jobFilterDepartment === 'all' || job.department === jobFilterDepartment;
-      
-      const matchesStatus = jobFilterStatus === 'all' || 
+
+      const matchesStatus = jobFilterStatus === 'all' ||
         (jobFilterStatus === 'active' && job.is_active) ||
         (jobFilterStatus === 'closed' && !job.is_active);
 
@@ -283,7 +325,7 @@ export default function SchoolDashboard() {
     mutationFn: async () => {
       // Comprehensive validation
       const errors: string[] = [];
-      
+
       if (!formData.title?.trim()) errors.push('Job title is required');
       if (!formData.department?.trim()) errors.push('Department is required');
       if (!formData.subject?.trim()) errors.push('Subject is required');
@@ -306,15 +348,25 @@ export default function SchoolDashboard() {
         throw new Error(errors.join('. '));
       }
 
-      const { data: userData, error: authError } = await supabase.auth.getUser();
-      if (authError || !userData.user) {
+      // Use user from AuthContext - check if available
+      // Wait for auth to finish loading if still loading
+      if (authLoading) {
+        throw new Error('Authentication is still loading. Please wait a moment and try again.');
+      }
+
+      if (!user) {
+        // Check if we're offline or if it's an auth issue
+        const isOnline = navigator.onLine;
+        if (!isOnline) {
+          throw new Error('You appear to be offline. Please check your internet connection and try again.');
+        }
         throw new Error('Not authenticated. Please log in again.');
       }
 
       // Prepare job data - map job_type to employment_type for database
       // CRITICAL: Use exact value that matches database CHECK constraint
       const employmentTypeValue = employmentType; // Already validated above
-      
+
       console.log('Job submission debug:', {
         employmentType: employmentTypeValue,
         isValid: isValidEmploymentType(employmentTypeValue),
@@ -322,7 +374,7 @@ export default function SchoolDashboard() {
       });
 
       const jobData: any = {
-        school_id: userData.user.id,
+        school_id: user.id,
         title: formData.title.trim(),
         department: formData.department.trim(),
         subject: formData.subject.trim(),
@@ -349,83 +401,336 @@ export default function SchoolDashboard() {
         jobData.application_deadline = formData.application_deadline;
       }
 
-      // Fetch school logo
-      try {
-        const { data: schoolData } = await supabase
-          .from('schools')
-          .select('logo_url')
-          .eq('user_id', userData.user.id)
-          .maybeSingle();
-        
-        jobData.school_logo = schoolData?.logo_url || null;
-      } catch (logoError) {
-        console.warn('Could not fetch school logo:', logoError);
-        jobData.school_logo = null;
+      if (formData.application_requirements) {
+        jobData.application_requirements = formData.application_requirements;
       }
 
-      const { data, error } = await supabase
-        .from('jobs')
-        .insert([jobData])
-        .select()
-        .single();
+      // Fetch school profile to get school_id (not user_id)
+      let schoolProfile: any = null;
+      try {
+        const { data: schoolData, error: schoolError } = await supabase
+          .from('schools')
+          .select('id, logo_url, school_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (schoolError) {
+          console.error('[Job Insert] Error fetching school profile:', schoolError);
+        } else {
+          schoolProfile = schoolData;
+          console.log('[Job Insert] School profile fetched:', {
+            school_id: schoolData?.id,
+            user_id: user.id,
+            school_name: schoolData?.school_name
+          });
+        }
+      } catch (schoolErr) {
+        console.error('[Job Insert] Exception fetching school profile:', schoolErr);
+      }
+
+      // Use school.id as school_id if available, otherwise fall back to user.id
+      if (schoolProfile?.id) {
+        jobData.school_id = schoolProfile.id;
+        console.log('[Job Insert] Using school.id as school_id:', schoolProfile.id);
+      } else {
+        console.warn('[Job Insert] No school profile found, using user.id as school_id:', user.id);
+        // Keep user.id as fallback, but this might cause RLS issues
+      }
+
+      // Fetch school logo in parallel (non-blocking) - set to null initially, update after job creation
+      // This prevents logo fetch from blocking job creation
+      jobData.school_logo = schoolProfile?.logo_url || null;
+      const logoFetchPromise = Promise.resolve(
+        supabase
+          .from('schools')
+          .select('logo_url')
+          .eq('user_id', user.id)
+          .maybeSingle()
+      ).then(({ data }) => data?.logo_url || null).catch((err: unknown) => {
+        console.warn('Could not fetch school logo:', err);
+        return null;
+      });
+
+      // DETAILED LOGGING BEFORE INSERT
+      console.log('[Job Insert] ============================================');
+      console.log('[Job Insert] Attempting insert with data:', {
+        ...jobData,
+        user_id: user?.id,
+        user_email: user?.email,
+        school_profile_id: schoolProfile?.id,
+        school_profile_name: schoolProfile?.school_name,
+        timestamp: new Date().toISOString(),
+      });
+      console.log('[Job Insert] User info:', {
+        id: user.id,
+        email: user.email,
+        role: user.user_metadata?.role,
+      });
+      console.log('[Job Insert] School profile:', schoolProfile);
+      console.log('[Job Insert] Job data keys:', Object.keys(jobData));
+      console.log('[Job Insert] Job data values:', Object.values(jobData).map(v =>
+        typeof v === 'string' ? v.substring(0, 50) : v
+      ));
+
+      // Insert job with increased timeout (database operations can be slow with triggers)
+      const insertTimeout = 20000; // 20 seconds - allows for database triggers and network latency
+      const insertController = new AbortController();
+      const insertTimeoutId = setTimeout(() => {
+        insertController.abort();
+      }, insertTimeout);
+
+      let data, error;
+      const startTime = Date.now();
+      console.log('[Job Insert] Starting insert query at:', new Date().toISOString());
+
+      // OPTION: Test with minimal insert first to isolate the issue
+      // Uncomment this block to test with minimal data
+      const USE_MINIMAL_TEST_INSERT = false; // Set to true for testing
+
+      try {
+        let insertQuery;
+        let insertPromise;
+
+        if (USE_MINIMAL_TEST_INSERT && schoolProfile?.id) {
+          // Minimal test insert with just required fields
+          console.log('[Job Insert] USING MINIMAL TEST INSERT');
+          const minimalJobData = {
+            school_id: schoolProfile.id,
+            title: 'Test Job',
+            department: formData.department.trim() || 'Test',
+            subject: formData.subject.trim() || 'Test',
+            grade_level: formData.grade_level.trim() || 'Elementary (1-5)',
+            employment_type: employmentTypeValue || 'Full-time',
+            location: formData.location.trim() || 'Test',
+            salary: formData.salary.trim() || 'Test',
+            description: 'Test description',
+            requirements: 'Test requirements',
+            benefits: 'Test benefits',
+            school_name: formData.school_name.trim() || 'Test School',
+            is_active: true,
+          };
+
+          console.log('[Job Insert] Minimal test data:', minimalJobData);
+
+          insertQuery = supabase
+            .from('jobs')
+            .insert([minimalJobData])
+            .select()
+            .single();
+        } else {
+          // Full insert with all data
+          console.log('[Job Insert] Using full job data insert');
+          insertQuery = supabase
+            .from('jobs')
+            .insert([jobData])
+            .select()
+            .single();
+        }
+
+        console.log('[Job Insert] Insert query constructed:', {
+          table: 'jobs',
+          data: USE_MINIMAL_TEST_INSERT ? 'minimal' : 'full',
+          select: 'single',
+          hasAbortSignal: !!insertController.signal,
+        });
+
+        insertPromise = insertQuery;
+
+        const insertTimeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Job creation timed out')), insertTimeout);
+        });
+
+        console.log('[Job Insert] Executing Promise.race with timeout:', insertTimeout, 'ms');
+        const result = await Promise.race([insertPromise, insertTimeoutPromise]);
+        clearTimeout(insertTimeoutId);
+        const elapsedTime = Date.now() - startTime;
+        console.log(`[Job Insert] Promise.race completed in ${elapsedTime}ms`);
+        console.log('[Job Insert] Result type:', typeof result);
+        console.log('[Job Insert] Result keys:', result ? Object.keys(result) : 'null');
+
+        // Handle Supabase response structure
+        if (result && 'data' in result) {
+          data = result.data;
+          error = result.error;
+          console.log('[Job Insert] Supabase response:', {
+            hasData: !!data,
+            hasError: !!error,
+            errorCode: error?.code,
+            errorMessage: error?.message,
+          });
+        } else {
+          // If result is the data directly (shouldn't happen, but handle it)
+          console.warn('[Job Insert] Unexpected result structure:', result);
+          data = result as any;
+          error = null;
+        }
+      } catch (insertError: any) {
+        clearTimeout(insertTimeoutId);
+        const elapsedTime = Date.now() - startTime;
+        console.error(`[Job Insert] ============================================`);
+        console.error(`[Job Insert] FAILED after ${elapsedTime}ms`);
+        console.error('[Job Insert] Error name:', insertError.name);
+        console.error('[Job Insert] Error message:', insertError.message);
+        console.error('[Job Insert] Error stack:', insertError.stack);
+        console.error('[Job Insert] Full error object:', insertError);
+
+        if (insertError.name === 'AbortError' || insertError.message?.includes('timed out')) {
+          console.error('[Job Insert] TIMEOUT DETECTED - Query took longer than', insertTimeout, 'ms');
+          console.error('[Job Insert] This suggests:');
+          console.error('[Job Insert]   1. RLS policy is blocking or hanging');
+          console.error('[Job Insert]   2. Database trigger is stuck');
+          console.error('[Job Insert]   3. Network connectivity issue');
+          console.error('[Job Insert]   4. Foreign key constraint issue');
+          throw new Error('Job creation took too long. The database may be experiencing high load or there may be a policy/constraint issue. Please try again in a moment.');
+        }
+        throw insertError;
+      }
 
       if (error) {
-        console.error('Job creation error:', {
+        const elapsedTime = Date.now() - startTime;
+        console.error(`[Job Insert] ============================================`);
+        console.error(`[Job Insert] Supabase returned error after ${elapsedTime}ms`);
+        console.error('[Job Insert] Error details:', {
           message: error.message,
           code: error.code,
           details: error.details,
           hint: error.hint,
         });
+        console.error('[Job Insert] Common error codes:');
+        console.error('[Job Insert]   - 42501: Insufficient privilege (RLS policy blocking)');
+        console.error('[Job Insert]   - 23503: Foreign key violation');
+        console.error('[Job Insert]   - 23502: Not null violation');
+        console.error('[Job Insert]   - 23505: Unique constraint violation');
+        console.error('[Job Insert]   - PGRST116: Column does not exist');
+        console.error('[Job Insert]   - PGRST204: Column not in schema cache');
 
-        // Comprehensive error handling
+        // Comprehensive error handling with helpful messages
+        console.error('[Job Insert] Processing error code:', error.code);
+
+        if (error.code === '42501') {
+          // Insufficient privilege - RLS policy blocking
+          console.error('[Job Insert] RLS POLICY BLOCKING INSERT');
+          console.error('[Job Insert] This means the Row Level Security policy is preventing the insert.');
+          console.error('[Job Insert] Check:');
+          console.error('[Job Insert]   1. RLS policies on jobs table');
+          console.error('[Job Insert]   2. school_id matches authenticated user');
+          console.error('[Job Insert]   3. User has INSERT permission');
+          throw new Error('Permission denied. Your account may not have permission to post jobs. Please ensure your school profile is complete and contact support if this persists.');
+        }
         if (error.code === '23502') {
           const column = error.message.match(/column "(\w+)"/)?.[1];
+          console.error('[Job Insert] Missing required field:', column);
           throw new Error(`Missing required field: ${column}. Please fill all required fields.`);
         }
         if (error.code === '23503') {
+          console.error('[Job Insert] Foreign key violation - school_id likely invalid');
+          console.error('[Job Insert] school_id used:', jobData.school_id);
+          console.error('[Job Insert] school_profile.id:', schoolProfile?.id);
           throw new Error('Invalid school reference. Please complete your school profile first.');
         }
         if (error.code === '23505') {
-          throw new Error('A job with these details already exists.');
+          throw new Error('A job with these details already exists. Please check your existing job postings.');
         }
         if (error.code === '23514') {
           // CHECK constraint violation - likely employment_type
           if (error.message.includes('employment_type')) {
             throw new Error(`Invalid employment type. Must be exactly one of: ${EMPLOYMENT_TYPES.join(', ')}. Received: "${employmentTypeValue}"`);
           }
-          throw new Error(`Data validation error: ${error.message}`);
+          throw new Error(`Data validation error: ${error.message}. Please check your input and try again.`);
         }
-        if (error.code === 'PGRST116' || error.message.includes('column') || error.message.includes('does not exist')) {
-          throw new Error(`Database schema error: ${error.message}. Please ensure all required columns exist.`);
-        }
-        
-        throw new Error(error.message || 'Failed to create job posting. Please try again.');
-      }
-
-      // Find matching teachers and send notifications (non-blocking)
-      if (data) {
-        try {
-          const matchingTeachers = await findMatchingTeachers({
-            id: data.id,
-            subject: data.subject,
-            grade_level: data.grade_level,
-            location: data.location,
-            archetype_tags: data.archetype_tags,
-          });
-
-          if (matchingTeachers.length > 0) {
-            const teacherUserIds = matchingTeachers.map(t => t.user_id);
-            await notifyJobPostedToTeachers(
-              teacherUserIds,
-              data.id,
-              data.title,
-              data.school_name
+        if (error.code === 'PGRST116' || error.code === 'PGRST204' || error.message.includes('column') || error.message.includes('does not exist')) {
+          if (error.message.includes('application_requirements')) {
+            throw new Error(
+              `Database schema error: The 'application_requirements' column is missing. ` +
+              `Please run the migration in Supabase SQL Editor: ` +
+              `Copy and run the contents of 'supabase-migrations/add_application_requirements.sql'`
             );
           }
-        } catch (notifError) {
-          // Log but don't fail job creation
-          console.error('Error sending job match notifications:', notifError);
+          throw new Error(`Database schema error: ${error.message}. Please ensure all required columns exist. Contact support if this persists.`);
         }
+
+        // Generic error with helpful context
+        const errorMessage = error.message || 'Failed to create job posting';
+        console.error('[Job Insert] Unknown error code:', error.code);
+        throw new Error(`${errorMessage}. Error code: ${error.code}. If this problem continues, please try again in a moment or contact support.`);
+      }
+
+      // Update logo if it was fetched (non-blocking - don't wait for it)
+      if (data && data.id) {
+        logoFetchPromise.then((logoUrl: string | null) => {
+          if (logoUrl) {
+            // Update job with logo in background (don't await)
+            Promise.resolve(
+              supabase
+                .from('jobs')
+                .update({ school_logo: logoUrl })
+                .eq('id', data.id)
+            ).then(({ error }) => {
+              if (error) {
+                console.warn('Failed to update job with logo:', error);
+              }
+            }).catch((err: unknown) => {
+              console.warn('Error updating job logo:', err);
+            });
+          }
+        }).catch((err: unknown) => {
+          console.warn('Logo fetch failed, job created without logo:', err);
+        });
+      }
+
+      // Find matching teachers and send notifications (truly non-blocking)
+      // This happens after job creation and won't block the response or throw errors
+      if (data) {
+        // Run matching/notifications in background - don't await or throw errors
+        Promise.resolve().then(async () => {
+          try {
+            const matchingStartTime = Date.now();
+            const matchingTimeout = 15000; // 15 seconds for matching + notifications
+
+            const matchingPromise = findMatchingTeachers({
+              id: data.id,
+              subject: data.subject,
+              grade_level: data.grade_level,
+              location: data.location,
+              archetype_tags: data.archetype_tags,
+            }).then(matchingTeachers => {
+              if (matchingTeachers.length > 0) {
+                const teacherUserIds = matchingTeachers.map(t => t.user_id);
+                return notifyJobPostedToTeachers(
+                  teacherUserIds,
+                  data.id,
+                  data.title,
+                  data.school_name
+                );
+              }
+              return Promise.resolve();
+            });
+
+            const matchingTimeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('Matching and notifications timed out')), matchingTimeout);
+            });
+
+            try {
+              await Promise.race([matchingPromise, matchingTimeoutPromise]);
+              const matchingElapsed = Date.now() - matchingStartTime;
+              console.log(`Matching and notifications completed in ${matchingElapsed}ms`);
+            } catch (matchingError: any) {
+              const matchingElapsed = Date.now() - matchingStartTime;
+              if (matchingError.message?.includes('timed out')) {
+                console.warn(`Matching and notifications timed out after ${matchingElapsed}ms, but job was created successfully`);
+              } else {
+                console.error(`Matching error after ${matchingElapsed}ms:`, matchingError);
+              }
+              // Don't throw - job creation was successful
+            }
+          } catch (notifError) {
+            // Log but don't fail job creation - this is background processing
+            console.error('Error in background matching/notifications:', notifError);
+          }
+        }).catch((err) => {
+          // Catch any unhandled errors in the background process
+          console.error('Unexpected error in background matching:', err);
+        });
       }
 
       return data;
@@ -443,10 +748,22 @@ export default function SchoolDashboard() {
     onError: (error: any) => {
       console.error('Job posting error:', error);
       const errorMessage = error?.message || 'Something went wrong. Please try again.';
+
+      // Provide more helpful error messages based on error type
+      let userFriendlyMessage = errorMessage;
+      if (errorMessage.includes('timed out') || errorMessage.includes('took too long')) {
+        userFriendlyMessage = 'The request took too long. This might be due to high server load. Please try again in a moment.';
+      } else if (errorMessage.includes('schema error')) {
+        userFriendlyMessage = 'Database configuration issue detected. Please contact support.';
+      } else if (errorMessage.includes('Missing required field')) {
+        userFriendlyMessage = errorMessage; // Keep the specific field error
+      }
+
       toast({
         title: 'Failed to post job',
-        description: errorMessage,
+        description: userFriendlyMessage,
         variant: 'destructive',
+        duration: 6000, // Show longer for important errors
       });
     },
   });
@@ -568,7 +885,7 @@ export default function SchoolDashboard() {
     onSuccess: (_, variables) => {
       toast({
         title: variables.isActive ? 'Job reopened' : 'Job closed',
-        description: variables.isActive 
+        description: variables.isActive
           ? 'The job posting is now active and accepting applications.'
           : 'The job posting is now closed and no longer accepting applications.',
       });
@@ -584,21 +901,29 @@ export default function SchoolDashboard() {
   });
 
   const resetForm = () => {
-      setFormData({
-        title: '',
+    setFormData({
+      title: '',
       department: '',
-        subject: '',
-        grade_level: '',
-        job_type: '',
-        location: '',
-        salary: '',
-        description: '',
-        requirements: '',
-        benefits: '',
-        school_name: '',
-        archetype_tags: [],
+      subject: '',
+      grade_level: '',
+      job_type: '',
+      location: '',
+      salary: '',
+      description: '',
+      requirements: '',
+      benefits: '',
+      school_name: '',
+      archetype_tags: [],
       start_date: '',
       application_deadline: '',
+      application_requirements: {
+        resume: true,
+        cover_letter: false,
+        desired_salary: false,
+        linkedin_url: false,
+        date_available: false,
+        website_portfolio: false,
+      },
     });
     setEditingJob(null);
   };
@@ -618,19 +943,45 @@ export default function SchoolDashboard() {
       benefits: job.benefits,
       school_name: job.school_name,
       archetype_tags: job.archetype_tags || [],
+      application_requirements: job.application_requirements || {
+        resume: true,
+        cover_letter: false,
+        desired_salary: false,
+        linkedin_url: false,
+        date_available: false,
+        website_portfolio: false,
+      },
       start_date: '',
       application_deadline: '',
     });
     setShowJobModal(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleWizardSubmit = async (wizardData: JobPostingFormData) => {
+    // Convert wizard data to formData format
+    setFormData({
+      title: wizardData.title,
+      department: wizardData.department,
+      subject: wizardData.subject,
+      grade_level: wizardData.grade_level,
+      job_type: wizardData.job_type,
+      location: wizardData.location,
+      salary: wizardData.salary,
+      description: wizardData.description,
+      requirements: wizardData.requirements,
+      benefits: wizardData.benefits,
+      school_name: wizardData.school_name,
+      archetype_tags: wizardData.archetype_tags,
+      start_date: wizardData.start_date,
+      application_deadline: wizardData.application_deadline,
+      application_requirements: wizardData.application_requirements,
+    });
+
+    // Use the existing mutation logic
     if (editingJob) {
-      updateJobMutation.mutate(editingJob.id);
+      await updateJobMutation.mutateAsync(editingJob.id);
     } else {
-    createJobMutation.mutate();
+      await createJobMutation.mutateAsync();
     }
   };
 
@@ -652,7 +1003,7 @@ export default function SchoolDashboard() {
           onViewAll={() => setLocation('/profile#achievements')}
         />
       )}
-      
+
       <div className="px-4 md:px-8 py-8 md:py-12 max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
@@ -715,7 +1066,7 @@ export default function SchoolDashboard() {
               <p className="text-3xl font-bold text-foreground">{stats.pendingApplications}</p>
             </Card>
             <Card className="p-6">
-                <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
                 <span className="text-sm text-muted-foreground">Recent (7 days)</span>
               </div>
@@ -732,7 +1083,19 @@ export default function SchoolDashboard() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setActiveTab('candidates')}
+                onClick={() => {
+                  setActiveTab('candidates');
+                  // Scroll to candidates section after tab switch
+                  setTimeout(() => {
+                    const element = document.getElementById('applications');
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                      // Fallback: scroll to top of candidates tab
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }, 100);
+                }}
                 className="text-sm"
               >
                 View All
@@ -760,7 +1123,7 @@ export default function SchoolDashboard() {
                         try {
                           // Get job_id from application
                           const jobId = (app as any).job_id;
-                          
+
                           if (!user?.id) {
                             toast({
                               title: 'Error',
@@ -769,31 +1132,46 @@ export default function SchoolDashboard() {
                             });
                             return;
                           }
-                          
+
+                          if (!app.teacher_id) {
+                            toast({
+                              title: 'Error',
+                              description: 'Missing teacher information.',
+                              variant: 'destructive',
+                            });
+                            return;
+                          }
+
                           // Get or create conversation (with timeout)
                           const convPromise = getOrCreateConversation(
                             app.teacher_id,
                             user.id,
                             jobId
                           );
-                          const timeoutPromise = new Promise((_, reject) => {
+                          const timeoutPromise = new Promise<never>((_, reject) => {
                             setTimeout(() => reject(new Error('Conversation creation timed out. Please try again.')), 10000);
                           });
-                          
-                          const { conversation } = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
-                          
+
+                          const result = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
+
+                          if (!result?.conversation?.id) {
+                            throw new Error('Failed to create or retrieve conversation.');
+                          }
+
                           // Navigate to messages
-                          setLocation(`/messages?conversation=${conversation.id}`);
+                          setLocation(`/messages?conversation=${result.conversation.id}`);
                         } catch (error: any) {
+                          console.error('Error opening conversation:', error);
                           toast({
                             title: 'Error',
-                            description: error.message || 'Failed to open conversation.',
+                            description: error.message || 'Failed to open conversation. Please try again.',
                             variant: 'destructive',
                           });
                         }
                       }}
                       className="h-8"
                       title="Message applicant"
+                      disabled={!app.teacher_id}
                     >
                       <MessageCircle className="h-4 w-4" />
                     </Button>
@@ -801,14 +1179,16 @@ export default function SchoolDashboard() {
                 </div>
               ))}
             </div>
-              </Card>
+          </Card>
         )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="jobs">Job Postings</TabsTrigger>
             <TabsTrigger value="candidates">Candidates</TabsTrigger>
+            <TabsTrigger value="offers">Offers</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="jobs" className="space-y-4">
@@ -847,43 +1227,43 @@ export default function SchoolDashboard() {
             </div>
 
             {/* Job List */}
-          {jobsLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
+            {jobsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
                   <Card key={i} className="p-6">
                     <Skeleton className="h-6 w-3/4 mb-2" />
                     <Skeleton className="h-4 w-1/2 mb-4" />
                     <Skeleton className="h-4 w-full" />
                   </Card>
-              ))}
-            </div>
+                ))}
+              </div>
             ) : filteredJobs && filteredJobs.length > 0 ? (
-            <div className="space-y-4">
+              <div className="space-y-4">
                 {filteredJobs.map((job) => (
-                <Card key={job.id} className="p-6" data-testid={`card-job-${job.id}`}>
+                  <Card key={job.id} className="p-6" data-testid={`card-job-${job.id}`}>
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-                    <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                      <Link href={`/jobs/${job.id}`}>
+                          <Link href={`/jobs/${job.id}`}>
                             <a className="text-xl font-semibold text-primary hover:underline block">
-                          {job.title}
-                        </a>
-                      </Link>
+                              {job.title}
+                            </a>
+                          </Link>
                           <Badge variant={job.is_active ? 'default' : 'secondary'} className="rounded-full flex-shrink-0">
                             {job.is_active ? 'Active' : 'Closed'}
                           </Badge>
                         </div>
-                      <p className="text-sm text-muted-foreground mb-2">{job.location}</p>
+                        <p className="text-sm text-muted-foreground mb-2">{job.location}</p>
                         <div className="flex flex-wrap gap-2 mb-2">
-                        <Badge variant="secondary" className="rounded-full">
+                          <Badge variant="secondary" className="rounded-full">
                             {job.department || job.subject}
-                        </Badge>
-                        <Badge variant="secondary" className="rounded-full">
-                          {job.grade_level}
-                        </Badge>
-                        <Badge variant="secondary" className="rounded-full">
-                          {job.job_type}
-                        </Badge>
+                          </Badge>
+                          <Badge variant="secondary" className="rounded-full">
+                            {job.grade_level}
+                          </Badge>
+                          <Badge variant="secondary" className="rounded-full">
+                            {job.job_type}
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                           <span>{job.applications?.length || 0} applications</span>
@@ -942,11 +1322,11 @@ export default function SchoolDashboard() {
                           <span className="hidden sm:inline">View Apps</span>
                         </Button>
                       </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          ) : (
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
               <EmptyState
                 icon="briefcase"
                 title="No job postings yet"
@@ -954,8 +1334,8 @@ export default function SchoolDashboard() {
                   ? "No jobs match your search criteria. Try adjusting your filters."
                   : "Create your first job posting to start receiving applications from qualified teachers."}
                 action={{
-                  label: jobSearchQuery || jobFilterDepartment !== 'all' || jobFilterStatus !== 'all' 
-                    ? "Clear Filters" 
+                  label: jobSearchQuery || jobFilterDepartment !== 'all' || jobFilterStatus !== 'all'
+                    ? "Clear Filters"
                     : "Post Your First Job",
                   onClick: () => {
                     if (jobSearchQuery || jobFilterDepartment !== 'all' || jobFilterStatus !== 'all') {
@@ -973,228 +1353,84 @@ export default function SchoolDashboard() {
           </TabsContent>
 
           <TabsContent value="candidates">
-            <div id="applications">
-            {user?.id && <CandidateDashboard schoolId={user.id} />}
-            </div>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">Candidate Pipeline</h2>
+                    <p className="text-muted-foreground">Manage applications across all your jobs</p>
+                  </div>
+                  <Button onClick={() => setShowManualCandidateModal(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Candidate
+                  </Button>
+                </div>
+
+                {user?.id && (
+                  <CandidatePipelineView schoolId={user.id} />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Offers Tab */}
+          <TabsContent value="offers">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold">Job Offers</h2>
+                    <p className="text-muted-foreground">Track all offers sent to candidates</p>
+                  </div>
+                </div>
+
+                {user?.id && <OffersTable schoolId={user.id} />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            {user?.id && <SchoolAnalyticsDashboard schoolId={user.id} />}
           </TabsContent>
         </Tabs>
       </div>
 
-      {/* Job Posting/Editing Modal */}
-      <Dialog open={showJobModal} onOpenChange={(open) => {
-        setShowJobModal(open);
-        if (!open) {
+      {/* Job Posting/Editing Wizard */}
+      <JobPostingWizard
+        isOpen={showJobModal}
+        onClose={() => {
+          setShowJobModal(false);
           resetForm();
-        }
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
-          <DialogHeader className="pb-4">
-            <DialogTitle className="text-xl md:text-2xl">
-              {editingJob ? 'Edit Job Posting' : 'Post a New Job'}
-            </DialogTitle>
-            <DialogDescription className="text-sm">
-              Fill in the details for your teaching position
-            </DialogDescription>
-          </DialogHeader>
+        }}
+        onSubmit={handleWizardSubmit}
+        initialData={editingJob ? {
+          title: editingJob.title,
+          department: editingJob.department || '',
+          subject: editingJob.subject,
+          grade_level: editingJob.grade_level,
+          job_type: editingJob.job_type || '',
+          location: editingJob.location,
+          salary: editingJob.salary,
+          description: editingJob.description,
+          requirements: editingJob.requirements,
+          benefits: editingJob.benefits,
+          school_name: editingJob.school_name,
+          archetype_tags: editingJob.archetype_tags || [],
+          start_date: '',
+          application_deadline: '',
+          application_requirements: editingJob.application_requirements || {
+            resume: true,
+            cover_letter: false,
+            desired_salary: false,
+            linkedin_url: false,
+            date_available: false,
+            website_portfolio: false,
+          },
+        } : undefined}
+        isSubmitting={createJobMutation.isPending || updateJobMutation.isPending}
+      />
 
-          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Job Title *</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  required
-                  className="h-12"
-                  data-testid="input-job-title"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="schoolName">School Name *</Label>
-                <Input
-                  id="schoolName"
-                  value={formData.school_name}
-                  onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
-                  required
-                  className="h-12"
-                  data-testid="input-school-name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="department">Department *</Label>
-                <Select value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
-                  <SelectTrigger className="h-12" data-testid="select-department">
-                    <SelectValue placeholder="Select department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DEPARTMENTS.map(dept => (
-                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject *</Label>
-                <Input
-                  id="subject"
-                  value={formData.subject}
-                  onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  required
-                  className="h-12"
-                  placeholder="e.g., Mathematics, English"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="gradeLevel">Grade Level *</Label>
-                <Select value={formData.grade_level} onValueChange={(value) => setFormData({ ...formData, grade_level: value })}>
-                  <SelectTrigger className="h-12" data-testid="select-grade">
-                    <SelectValue placeholder="Select grade level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GRADE_LEVELS.map(level => (
-                      <SelectItem key={level} value={level}>{level}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="employmentType">Employment Type *</Label>
-                <Select value={formData.job_type} onValueChange={(value) => setFormData({ ...formData, job_type: value })}>
-                  <SelectTrigger className="h-12" data-testid="select-employment-type">
-                    <SelectValue placeholder="Select employment type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EMPLOYMENT_TYPES.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location">Location *</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  required
-                  className="h-12"
-                  data-testid="input-location"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="salary">Salary Range *</Label>
-                <Input
-                  id="salary"
-                  value={formData.salary}
-                  onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                  placeholder="e.g., $50,000 - $70,000"
-                  required
-                  className="h-12 text-base"
-                  data-testid="input-salary"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Job Description *</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                required
-                className="min-h-32 text-base"
-                data-testid="textarea-description"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="requirements">Requirements *</Label>
-              <Textarea
-                id="requirements"
-                value={formData.requirements}
-                onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
-                required
-                className="min-h-24 text-base"
-                data-testid="textarea-requirements"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="benefits">Benefits *</Label>
-              <Textarea
-                id="benefits"
-                value={formData.benefits}
-                onChange={(e) => setFormData({ ...formData, benefits: e.target.value })}
-                required
-                className="min-h-24 text-base"
-                data-testid="textarea-benefits"
-              />
-            </div>
-
-            {/* Teaching Archetypes */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Desired Teaching Archetypes (Optional)</Label>
-              <p className="text-xs text-muted-foreground mb-3">
-                Select archetypes that would be a good fit for this position. This helps match teachers automatically.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {ARCHETYPES.map((archetype) => (
-                  <label 
-                    key={archetype} 
-                    className="flex items-center space-x-3 cursor-pointer p-3 rounded-lg border border-border hover:bg-muted transition-colors min-h-[44px]"
-                  >
-                    <Checkbox
-                      checked={formData.archetype_tags.includes(archetype)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setFormData({ ...formData, archetype_tags: [...formData.archetype_tags, archetype] });
-                        } else {
-                          setFormData({ ...formData, archetype_tags: formData.archetype_tags.filter(t => t !== archetype) });
-                        }
-                      }}
-                    />
-                    <span className="text-sm font-medium">{archetype}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <DialogFooter className="flex-col sm:flex-row gap-3 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowJobModal(false);
-                  resetForm();
-                }}
-                disabled={createJobMutation.isPending || updateJobMutation.isPending}
-                className="w-full sm:w-auto h-11 order-2 sm:order-1"
-                data-testid="button-cancel-job"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={createJobMutation.isPending || updateJobMutation.isPending}
-                className="w-full sm:w-auto h-11 order-1 sm:order-2"
-                data-testid="button-submit-job"
-              >
-                {createJobMutation.isPending || updateJobMutation.isPending
-                  ? (editingJob ? 'Updating...' : 'Posting...')
-                  : (editingJob ? 'Update Job' : 'Post Job')}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteJobId} onOpenChange={(open) => !open && setDeleteJobId(null)}>

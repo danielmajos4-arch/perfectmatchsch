@@ -11,7 +11,7 @@ export function TrustBadges() {
 
   return (
     <div>
-      <p className="text-xs md:text-sm text-gray-400 mb-3 md:mb-4 text-center md:text-left">
+      <p className="text-xs md:text-sm text-gray-400 dark:text-gray-300 mb-3 md:mb-4 text-center md:text-left">
         Trusted by leading schools and educators
       </p>
       <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 md:gap-6 lg:gap-8">
@@ -20,7 +20,7 @@ export function TrustBadges() {
           return (
             <div
               key={index}
-              className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors cursor-default"
+              className="flex items-center gap-2 text-gray-300 dark:text-gray-200 hover:text-white dark:hover:text-gray-100 transition-colors cursor-default"
             >
               <Icon className="h-4 w-4 md:h-5 md:w-5" />
               <span className="text-xs md:text-sm font-medium">{badge.name}</span>

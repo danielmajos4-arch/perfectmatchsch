@@ -75,30 +75,7 @@ export default function Messages() {
         throw new Error('User not loaded');
       }
 
-      let profileId: string | null = null;
-
-      if (role === 'teacher') {
-        const { data: teacher, error } = await supabase
-          .from('teachers')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        if (error) throw error;
-        profileId = teacher?.id || null;
-      } else {
-        const { data: school, error } = await supabase
-          .from('schools')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        if (error) throw error;
-        profileId = school?.id || null;
-      }
-
-      if (!profileId) {
-        throw new Error('User profile not found');
-      }
-
+      // Conversations table uses user_id directly, not profile IDs
       let query = supabase
         .from('conversations')
         .select(`
@@ -109,18 +86,6 @@ export default function Messages() {
           last_message_at,
           created_at,
           messages(*),
-          teacher:teachers!teacher_id(
-            id,
-            user_id,
-            full_name,
-            profile_photo_url
-          ),
-          school:schools!school_id(
-            id,
-            user_id,
-            school_name,
-            logo_url
-          ),
           job:jobs(
             id,
             title,
@@ -129,20 +94,52 @@ export default function Messages() {
         `)
         .order('last_message_at', { ascending: false });
 
+      // Filter by user_id (conversations table uses user IDs)
       if (role === 'teacher') {
-        query = query.eq('teacher_id', profileId);
+        query = query.eq('teacher_id', user.id);
       } else {
-        query = query.eq('school_id', profileId);
+        query = query.eq('school_id', user.id);
       }
 
-      const { data, error } = await query;
+      const { data: conversationsData, error } = await query;
 
       if (error) {
         console.error('Error fetching conversations:', error);
         throw error;
       }
 
-      return data as ConversationWithUsers[];
+      if (!conversationsData || conversationsData.length === 0) {
+        return [];
+      }
+
+      // Fetch teacher and school profiles separately
+      const teacherIds = [...new Set(conversationsData.map(c => c.teacher_id))];
+      const schoolIds = [...new Set(conversationsData.map(c => c.school_id))];
+
+      const [teachersResult, schoolsResult] = await Promise.all([
+        supabase
+          .from('teachers')
+          .select('id, user_id, full_name, profile_photo_url')
+          .in('user_id', teacherIds),
+        supabase
+          .from('schools')
+          .select('id, user_id, school_name, logo_url')
+          .in('user_id', schoolIds),
+      ]);
+
+      const teachersMap = new Map(
+        (teachersResult.data || []).map(t => [t.user_id, t])
+      );
+      const schoolsMap = new Map(
+        (schoolsResult.data || []).map(s => [s.user_id, s])
+      );
+
+      // Transform the data to match ConversationWithUsers interface
+      return conversationsData.map((conv: any) => ({
+        ...conv,
+        teacher: teachersMap.get(conv.teacher_id) || null,
+        school: schoolsMap.get(conv.school_id) || null,
+      })) as ConversationWithUsers[];
     },
     enabled: !!user?.id && !!role,
   });

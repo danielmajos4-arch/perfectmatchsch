@@ -143,9 +143,9 @@ function setupGracefulShutdown(server: Server) {
       serveStatic(app);
     }
 
-    // ✅ Fixed host for macOS 12+ (IPv4 only, no IPv6)
-    // Use 127.0.0.1 instead of ::1 or 0.0.0.0 to avoid ENOTSUP on macOS 12
-    const host = "127.0.0.1";
+    // Use 0.0.0.0 to allow access from other devices on the network (e.g., mobile)
+    // In production, this should be restricted for security
+    const host = process.env.HOST || "0.0.0.0";
     const preferredPort = parseInt(process.env.PORT || "5000", 10);
     const fallbackPort = 3000;
 

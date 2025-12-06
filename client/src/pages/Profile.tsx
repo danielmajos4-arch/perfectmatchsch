@@ -10,11 +10,14 @@ import { supabase } from '@/lib/supabaseClient';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { TeacherProfileEditor } from '@/components/TeacherProfileEditor';
+import { SchoolProfileEditor } from '@/components/SchoolProfileEditor';
 import { ResumeUpload } from '@/components/ResumeUpload';
 import { PortfolioUpload } from '@/components/PortfolioUpload';
 import { ArchetypeGrowthResources } from '@/components/ArchetypeGrowthResources';
 import { AchievementCollection } from '@/components/achievements';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTeacherProfile } from '@/hooks/useTeacherProfile';
+import { useSchoolProfile } from '@/hooks/useSchoolProfile';
 import type { Teacher, School } from '@shared/schema';
 
 export default function Profile() {
@@ -29,45 +32,21 @@ export default function Profile() {
     },
   });
 
-  const { data: teacherProfile } = useQuery<Teacher>({
-    queryKey: ['/api/teacher-profile', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+  const { data: teacherProfile } = useTeacherProfile(user?.id);
+  const { data: schoolProfile } = useSchoolProfile(user?.id);
 
-      if (error && error.code !== 'PGRST116') throw error;
-      return data as Teacher | null;
-    },
-    enabled: !!user?.id && user?.user_metadata?.role === 'teacher',
-  });
-
-  const { data: schoolProfile } = useQuery<School>({
-    queryKey: ['/api/school-profile', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('schools')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      return data as School | null;
-    },
-    enabled: !!user?.id && user?.user_metadata?.role === 'school',
-  });
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast({
-      title: 'Logged out',
-      description: 'You have been successfully logged out.',
-    });
-    setLocation('/login');
+  const handleLogout = () => {
+    console.log('[Profile] Logout - clearing session and redirecting');
+    
+    // Clear all auth storage immediately (don't wait for signOut)
+    localStorage.removeItem('perfectmatch-auth');
+    sessionStorage.clear();
+    
+    // Fire signOut in background (don't await - it can hang)
+    supabase.auth.signOut().catch(() => {});
+    
+    // Redirect immediately
+    window.location.href = '/login';
   };
 
   const getInitials = (name: string) => {
@@ -84,239 +63,148 @@ export default function Profile() {
 
   return (
     <AuthenticatedLayout>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="px-4 md:px-8 py-8 md:py-12 max-w-5xl mx-auto">
-        {/* Header - Mobile First */}
-          <div className="mb-6 md:mb-10">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent">Profile</h1>
-            <p className="text-muted-foreground text-sm sm:text-base md:text-lg">Manage your account settings and personal information</p>
+      <div className="min-h-screen bg-background">
+        {/* Hero / Header Section */}
+        <div className="relative h-48 md:h-64 bg-gradient-to-r from-primary/10 via-primary/5 to-background overflow-hidden">
+          <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
+          <div className="container mx-auto px-4 h-full flex flex-col justify-center">
+            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent mb-2">
+              Profile
+            </h1>
+            <p className="text-muted-foreground text-lg md:text-xl max-w-2xl">
+              Manage your professional identity and account settings
+            </p>
+          </div>
         </div>
 
-                {/* Teacher Profile Editor */}
-                {isTeacher && teacherProfile && user?.id && (
-                  <div className="mb-6 md:mb-8 space-y-6">
-                    <Card className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-card via-card to-primary/5 border-primary/10 shadow-lg">
-                      <TeacherProfileEditor teacher={teacherProfile} userId={user.id} />
-                    </Card>
-                    
-                    {/* Resume Upload */}
-                    <ResumeUpload 
-                      teacher={teacherProfile} 
+        <div className="container mx-auto px-4 -mt-12 pb-12">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+            {/* Left Sidebar (Identity & Account) */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Identity Card */}
+              <Card className="border-border/50 shadow-xl backdrop-blur-sm bg-card/95 overflow-hidden">
+                <div className="h-24 bg-gradient-to-br from-primary/20 to-purple-500/20" />
+                <CardContent className="pt-0 relative">
+                  <div className="flex justify-center -mt-12 mb-4">
+                    <div className="relative">
+                      <Avatar className="h-24 w-24 md:h-32 md:w-32 border-4 border-card shadow-2xl ring-2 ring-primary/10">
+                        <AvatarImage
+                          src={teacherProfile?.profile_photo_url || schoolProfile?.logo_url || undefined}
+                          alt={teacherProfile?.full_name || schoolProfile?.school_name || user?.user_metadata?.full_name || 'User'}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-primary-foreground font-bold text-3xl">
+                          {teacherProfile?.full_name
+                            ? getInitials(teacherProfile.full_name)
+                            : schoolProfile?.school_name
+                              ? getInitials(schoolProfile.school_name)
+                              : (user?.user_metadata?.full_name ? getInitials(user.user_metadata.full_name) : 'U')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute bottom-2 right-2 h-5 w-5 bg-green-500 rounded-full border-2 border-card shadow-sm" title="Online"></div>
+                    </div>
+                  </div>
+
+                  <div className="text-center space-y-2 mb-6">
+                    <h2 className="text-2xl font-bold text-foreground break-words">
+                      {teacherProfile?.full_name || schoolProfile?.school_name || user?.user_metadata?.full_name || 'User'}
+                    </h2>
+                    <div className="flex items-center justify-center gap-2">
+                      <Badge variant="secondary" className="rounded-full px-3 py-1 capitalize">
+                        {user?.user_metadata?.role || 'User'}
+                      </Badge>
+                      {isSchool && schoolProfile?.school_type && (
+                        <Badge variant="outline" className="rounded-full px-3 py-1">
+                          {schoolProfile.school_type}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      <span className="truncate max-w-[200px]">{user?.email}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-6 border-t border-border/50">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Account Type</span>
+                      <span className="font-medium capitalize">{user?.user_metadata?.role || 'User'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Member Since</span>
+                      <span className="font-medium">
+                        {new Date(user?.created_at || Date.now()).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-8">
+                    <Button
+                      variant="destructive"
+                      className="w-full gap-2"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign Out
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions / Status (Optional) */}
+              {/* Could add profile completion status here if needed */}
+            </div>
+
+            {/* Right Content Area (Editors & Details) */}
+            <div className="lg:col-span-8 space-y-8">
+
+              {/* School Profile Editor */}
+              {isSchool && schoolProfile && user?.id && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <SchoolProfileEditor school={schoolProfile} userId={user.id} />
+                </div>
+              )}
+
+              {/* Teacher Profile Editor */}
+              {isTeacher && teacherProfile && user?.id && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <TeacherProfileEditor teacher={teacherProfile} userId={user.id} />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <ResumeUpload
+                      teacher={teacherProfile}
                       userId={user.id}
-                      onUpdate={(url) => {
-                        // Refresh teacher profile
+                      onUpdate={() => {
                         queryClient.invalidateQueries({ queryKey: ['/api/teacher-profile', user.id] });
                       }}
                     />
-                    
-                    {/* Portfolio Upload */}
-                    <PortfolioUpload 
-                      teacher={teacherProfile} 
+                    <PortfolioUpload
+                      teacher={teacherProfile}
                       userId={user.id}
-                      onUpdate={(url) => {
-                        // Refresh teacher profile
+                      onUpdate={() => {
                         queryClient.invalidateQueries({ queryKey: ['/api/teacher-profile', user.id] });
                       }}
                     />
                   </div>
-                )}
 
-          {/* Achievements Section */}
-          {user?.id && (
-            <div className="mb-6 md:mb-8" id="achievements">
-              <AchievementCollection userId={user.id} showProgress={true} />
-            </div>
-          )}
+                  {/* Achievements */}
+                  <div id="achievements">
+                    <AchievementCollection userId={user.id} showProgress={true} />
+                  </div>
 
-          {/* Profile Overview Card - Mobile First */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 md:mb-8">
-            {/* Profile Avatar & Basic Info */}
-            <Card className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-card via-card to-primary/5 border-primary/10 shadow-md lg:col-span-1">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="relative">
-                  <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-32 md:w-32 border-4 border-primary/30 shadow-xl ring-4 ring-primary/10">
-                    <AvatarImage 
-                      src={teacherProfile?.profile_photo_url || schoolProfile?.logo_url || undefined} 
-                      alt={teacherProfile?.full_name || schoolProfile?.school_name || user?.user_metadata?.full_name || 'User'} 
-                    />
-                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-3xl">
-                      {teacherProfile?.full_name 
-                        ? getInitials(teacherProfile.full_name) 
-                        : schoolProfile?.school_name 
-                        ? getInitials(schoolProfile.school_name) 
-                        : (user?.user_metadata?.full_name ? getInitials(user.user_metadata.full_name) : 'U')}
-              </AvatarFallback>
-            </Avatar>
-                  <div className="absolute -bottom-1 -right-1 h-7 w-7 bg-green-500 rounded-full border-3 border-background shadow-lg"></div>
+                  {/* Archetype Resources */}
+                  {teacherProfile.archetype && (
+                    <ArchetypeGrowthResources teacher={teacherProfile} />
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground break-words">
-                    {teacherProfile?.full_name || schoolProfile?.school_name || user?.user_metadata?.full_name || 'User'}
-              </h2>
-                  <Badge variant="secondary" className="rounded-full capitalize px-3 sm:px-4 py-1.5 text-xs sm:text-sm">
-                  {user?.user_metadata?.role || 'User'}
-                </Badge>
-                  <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-muted-foreground pt-2">
-                <Mail className="h-4 w-4 flex-shrink-0" />
-                    <span className="break-all">{user?.email}</span>
-              </div>
+              )}
             </div>
           </div>
-        </Card>
-
-            {/* Teacher Details Grid - Mobile First */}
-            {isTeacher && teacherProfile && (
-              <Card className="p-4 sm:p-6 md:p-8 bg-card border-border shadow-md lg:col-span-2">
-                <h3 className="text-lg sm:text-xl font-bold text-foreground mb-4 sm:mb-6 pb-3 border-b border-border">Profile Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Location</p>
-                    <p className="text-base font-medium text-foreground">{teacherProfile.location || 'Not set'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Experience</p>
-                    <p className="text-base font-medium text-foreground">{teacherProfile.years_experience || 'Not set'}</p>
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subjects</p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {teacherProfile.subjects && teacherProfile.subjects.length > 0 ? (
-                        teacherProfile.subjects.map((subject, idx) => (
-                          <Badge key={idx} variant="outline" className="rounded-full">
-                            {subject}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No subjects added</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grade Levels</p>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {teacherProfile.grade_levels && teacherProfile.grade_levels.length > 0 ? (
-                        teacherProfile.grade_levels.map((level, idx) => (
-                          <Badge key={idx} variant="outline" className="rounded-full">
-                            {level}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No grade levels added</p>
-                      )}
-                    </div>
-                  </div>
-                  {teacherProfile.bio && (
-                    <div className="space-y-1 md:col-span-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bio</p>
-                      <p className="text-sm text-foreground leading-relaxed">{teacherProfile.bio}</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            )}
-
-            {/* School Details Grid - Mobile First */}
-            {isSchool && schoolProfile && (
-              <Card className="p-4 sm:p-6 md:p-8 bg-card border-border shadow-md lg:col-span-2">
-                <h3 className="text-lg sm:text-xl font-bold text-foreground mb-4 sm:mb-6 pb-3 border-b border-border flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  School Details
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">School Name</p>
-                    <p className="text-base font-medium text-foreground">{schoolProfile.school_name || 'Not set'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">School Type</p>
-                    <Badge variant="secondary" className="rounded-full">
-                      {schoolProfile.school_type || 'Not set'}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Location</p>
-                    <p className="text-base font-medium text-foreground">{schoolProfile.location || 'Not set'}</p>
-                  </div>
-                  {schoolProfile.website && (
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Website</p>
-                      <a
-                        href={schoolProfile.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-base font-medium text-primary hover:underline flex items-center gap-1"
-                      >
-                        {schoolProfile.website}
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </div>
-                  )}
-                  {schoolProfile.description && (
-                    <div className="space-y-1 md:col-span-2">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</p>
-                      <p className="text-sm text-foreground leading-relaxed">{schoolProfile.description}</p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            )}
-          </div>
-
-          {/* Account Information - Mobile First */}
-          <Card className="mb-6 md:mb-8 bg-card border-border shadow-md">
-            <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6">
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                  <UserIcon className="h-5 w-5 text-primary" />
-                </div>
-              Account Information
-            </CardTitle>
-          </CardHeader>
-            <CardContent className="space-y-0 px-4 sm:px-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 border-b border-border hover:bg-muted/50 px-2 rounded transition-colors gap-2">
-                <span className="text-sm font-semibold text-foreground">Full Name</span>
-              <span className="text-sm text-muted-foreground break-words sm:text-right">
-                {user?.user_metadata?.full_name || 'Not set'}
-              </span>
-            </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 border-b border-border hover:bg-muted/50 px-2 rounded transition-colors gap-2">
-                <span className="text-sm font-semibold text-foreground">Email</span>
-                <span className="text-sm text-muted-foreground break-all sm:text-right">{user?.email}</span>
-            </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 hover:bg-muted/50 px-2 rounded transition-colors gap-2">
-                <span className="text-sm font-semibold text-foreground">Account Type</span>
-              <Badge variant="secondary" className="rounded-full capitalize w-fit">
-                {user?.user_metadata?.role || 'User'}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-
-          {/* Archetype Growth Resources */}
-          {isTeacher && teacherProfile?.archetype && (
-            <div className="mb-6 md:mb-8">
-              <Card className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-card via-card to-accent/5 border-accent/10 shadow-md">
-                <ArchetypeGrowthResources teacher={teacherProfile} />
-              </Card>
-            </div>
-          )}
-
-        {/* Actions - Mobile First */}
-          <Card className="bg-card border-border shadow-md">
-            <CardContent className="p-4 sm:p-6">
-          <Button
-            variant="destructive"
-                className="w-full h-12 gap-2 font-semibold"
-            onClick={handleLogout}
-            data-testid="button-logout"
-          >
-            <LogOut className="h-5 w-5" />
-            Log Out
-          </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </AuthenticatedLayout>
   );
 }
+// End of Profile component
+

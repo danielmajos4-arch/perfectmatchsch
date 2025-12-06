@@ -4,7 +4,8 @@
 import { supabase } from './supabaseClient';
 import { notifyApplicationStatusUpdate } from './notificationService';
 import { triggerApplicationStatusEmail } from './emailTriggers';
-import type { CandidateMatchView, TeacherJobMatch, Job } from '@shared/matching';
+import type { CandidateMatchView, TeacherJobMatch } from '@shared/matching';
+import type { Job } from '@shared/schema';
 
 /**
  * Get candidates for a specific job (for school dashboard)
@@ -44,6 +45,7 @@ export async function getJobCandidates(
 
 /**
  * Get all candidates for a school (across all their jobs)
+ * Includes both candidate_matches and applications without candidates
  */
 export async function getSchoolCandidates(schoolId: string, filters?: {
   jobId?: string;
@@ -53,7 +55,7 @@ export async function getSchoolCandidates(schoolId: string, filters?: {
   // First get all jobs for this school
   const { data: jobs, error: jobsError } = await supabase
     .from('jobs')
-    .select('id')
+    .select('id, title, school_name, subject, grade_level, location')
     .eq('school_id', schoolId);
 
   if (jobsError) throw jobsError;
@@ -61,28 +63,205 @@ export async function getSchoolCandidates(schoolId: string, filters?: {
 
   const jobIds = jobs.map(j => j.id);
 
-  let query = supabase
+  // Query candidate_matches (includes job_candidates)
+  let candidateQuery = supabase
     .from('candidate_matches')
     .select('*')
-    .in('job_id', jobIds)
-    .order('match_score', { ascending: false });
+    .in('job_id', jobIds);
 
   if (filters?.jobId) {
-    query = query.eq('job_id', filters.jobId);
+    candidateQuery = candidateQuery.eq('job_id', filters.jobId);
   }
 
   if (filters?.status) {
-    query = query.eq('status', filters.status);
+    candidateQuery = candidateQuery.eq('status', filters.status);
   }
 
   if (filters?.archetype) {
-    query = query.eq('teacher_archetype', filters.archetype);
+    candidateQuery = candidateQuery.eq('teacher_archetype', filters.archetype);
   }
 
-  const { data, error } = await query;
+  let candidates: CandidateMatchView[] = [];
+  const { data: candidatesData, error: candidatesError } = await candidateQuery;
 
-  if (error) throw error;
-  return data as CandidateMatchView[];
+  if (candidatesError) {
+    console.error('Error fetching candidates:', candidatesError);
+    // If view doesn't exist, try querying job_candidates directly
+    if (candidatesError.code === '42P01' || candidatesError.message?.includes('does not exist')) {
+      console.warn('candidate_matches view not found, querying job_candidates directly');
+      // Fallback: query job_candidates directly
+      let fallbackQuery = supabase
+        .from('job_candidates')
+        .select(`
+          *,
+          job:jobs(id, title, school_name, subject, grade_level, location),
+          teacher:teachers!job_candidates_teacher_id_fkey(
+            id,
+            user_id,
+            full_name,
+            email,
+            archetype,
+            subjects,
+            grade_levels,
+            years_experience,
+            location,
+            profile_photo_url,
+            resume_url,
+            portfolio_url
+          )
+        `)
+        .in('job_id', jobIds);
+
+      if (filters?.jobId) {
+        fallbackQuery = fallbackQuery.eq('job_id', filters.jobId);
+      }
+
+      if (filters?.status) {
+        fallbackQuery = fallbackQuery.eq('status', filters.status);
+      }
+
+      const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+
+      if (!fallbackError && fallbackData) {
+        // Transform to CandidateMatchView format
+        candidates = fallbackData.map((c: any) => {
+          const job = Array.isArray(c.job) ? c.job[0] : c.job;
+          const teacher = Array.isArray(c.teacher) ? c.teacher[0] : c.teacher;
+
+          return {
+            id: c.id,
+            job_id: c.job_id,
+            teacher_id: c.teacher_id,
+            match_score: c.match_score,
+            match_reason: c.match_reason,
+            status: c.status,
+            school_notes: c.school_notes,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+            job_title: job?.title || '',
+            school_name: job?.school_name || '',
+            job_subject: job?.subject || '',
+            job_grade_level: job?.grade_level || '',
+            job_location: job?.location || '',
+            teacher_name: teacher?.full_name || 'Unknown Teacher',
+            teacher_email: teacher?.email || '',
+            teacher_archetype: teacher?.archetype || null,
+            teacher_subjects: teacher?.subjects || [],
+            teacher_grade_levels: teacher?.grade_levels || [],
+            years_experience: teacher?.years_experience || '',
+            teacher_location: teacher?.location || '',
+            profile_photo_url: teacher?.profile_photo_url || null,
+            resume_url: teacher?.resume_url || null,
+            portfolio_url: teacher?.portfolio_url || null,
+          };
+        }) as CandidateMatchView[];
+      }
+    }
+  } else {
+    candidates = (candidatesData || []) as CandidateMatchView[];
+  }
+
+  // Also query applications directly to catch any that don't have candidates
+  let applicationQuery = supabase
+    .from('applications')
+    .select(`
+      id,
+      job_id,
+      teacher_id,
+      status,
+      applied_at,
+      cover_letter,
+      job:jobs(id, title, school_name, subject, grade_level, location),
+      teacher:teachers!applications_teacher_id_fkey(
+        id,
+        user_id,
+        full_name,
+        email,
+        archetype,
+        subjects,
+        grade_levels,
+        years_experience,
+        location,
+        profile_photo_url,
+        resume_url,
+        portfolio_url
+      )
+    `)
+    .in('job_id', jobIds);
+
+  if (filters?.jobId) {
+    applicationQuery = applicationQuery.eq('job_id', filters.jobId);
+  }
+
+  const { data: applications, error: applicationsError } = await applicationQuery;
+
+  if (applicationsError) {
+    console.error('Error fetching applications:', applicationsError);
+  }
+
+  // Get candidate IDs to check which applications already have candidates
+  const candidateTeacherIds = new Set(
+    candidates.map(c => `${c.job_id}-${c.teacher_id}`)
+  );
+
+  // Convert applications to CandidateMatchView format for those without candidates
+  const applicationCandidates: CandidateMatchView[] = (applications || [])
+    .filter(app => {
+      const key = `${app.job_id}-${app.teacher_id}`;
+      return !candidateTeacherIds.has(key);
+    })
+    .map(app => {
+      const job = Array.isArray(app.job) ? app.job[0] : app.job;
+      const teacher = Array.isArray(app.teacher) ? app.teacher[0] : app.teacher;
+
+      return {
+        id: app.id, // Use application ID as candidate ID
+        job_id: app.job_id,
+        teacher_id: app.teacher_id,
+        match_score: 5, // Default score for applications
+        match_reason: 'Application submitted',
+        status: app.status === 'pending' ? 'new' :
+          app.status === 'under_review' ? 'reviewed' :
+            app.status === 'accepted' ? 'shortlisted' :
+              app.status === 'rejected' ? 'hidden' : 'new',
+        school_notes: null,
+        created_at: app.applied_at,
+        updated_at: app.applied_at,
+        job_title: job?.title || 'Unknown Job',
+        school_name: job?.school_name || 'Unknown School',
+        job_subject: job?.subject || '',
+        job_grade_level: job?.grade_level || '',
+        job_location: job?.location || '',
+        teacher_profile_id: teacher?.id || '',
+        teacher_name: teacher?.full_name || 'Unknown Teacher',
+        teacher_email: teacher?.email || '',
+        teacher_archetype: teacher?.archetype || null,
+        teacher_subjects: teacher?.subjects || [],
+        teacher_grade_levels: teacher?.grade_levels || [],
+        years_experience: teacher?.years_experience || '',
+        teacher_location: teacher?.location || '',
+        profile_photo_url: teacher?.profile_photo_url || null,
+        resume_url: teacher?.resume_url || null,
+        portfolio_url: teacher?.portfolio_url || null,
+        application_id: app.id, // Store application ID for reference
+      } as CandidateMatchView;
+    });
+
+  // Combine candidates and application-based candidates
+  const allCandidates = [
+    ...candidates,
+    ...applicationCandidates
+  ];
+
+  // Sort by match score (descending) and then by created_at (newest first)
+  allCandidates.sort((a, b) => {
+    if (b.match_score !== a.match_score) {
+      return b.match_score - a.match_score;
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  return allCandidates;
 }
 
 /**
@@ -141,7 +320,7 @@ export async function getTeacherJobMatches(
  */
 export async function updateCandidateStatus(
   candidateId: string,
-  status: 'new' | 'reviewed' | 'contacted' | 'shortlisted' | 'hired' | 'hidden',
+  status: string,
   notes?: string
 ) {
   const updateData: any = { status, updated_at: new Date().toISOString() };
@@ -215,7 +394,7 @@ export async function updateCandidateStatus(
             job.title,
             applicationStatus
           );
-          
+
           // Also trigger email notification
           await triggerApplicationStatusEmail(
             candidateData.teacher_id,
@@ -287,7 +466,7 @@ export async function getJobsByArchetype(
   const { data, error } = await query;
 
   if (error) throw error;
-  
+
   // Map employment_type to job_type for UI consistency
   return (data || []).map(job => ({
     ...job,

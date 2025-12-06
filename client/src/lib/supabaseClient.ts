@@ -3,6 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+console.log('🔧 [Supabase] Checking env vars:', {
+  url: supabaseUrl,
+  keyExists: !!supabaseAnonKey,
+  keyLength: supabaseAnonKey?.length
+});
+
 if (!supabaseUrl || !supabaseAnonKey) {
   const missingVars: string[] = [];
   if (!supabaseUrl) missingVars.push("VITE_SUPABASE_URL");
@@ -47,25 +53,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    // Use localStorage for session storage (works in PWA)
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     storageKey: 'perfectmatch-auth',
   },
-  // Global fetch options for better error handling
-  global: {
-    fetch: async (url, options) => {
-      try {
-        const response = await fetch(url, {
-          ...options,
-          // Add timeout signal if not already present
-          signal: options?.signal || AbortSignal.timeout(15000),
-        });
-        return response;
-      } catch (error) {
-        // Log fetch errors for debugging
-        console.error('[Supabase] Fetch error:', error);
-        throw error;
-      }
-    },
-  },
 });
+
+console.log('✅ [Supabase] Client initialized successfully');

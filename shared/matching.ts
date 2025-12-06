@@ -1,4 +1,4 @@
-// Matching system types and interfaces for Sprint 6
+import { Job } from './schema';
 
 export interface JobCandidate {
   id: string;
@@ -6,7 +6,7 @@ export interface JobCandidate {
   teacher_id: string;
   match_score: number;
   match_reason: string | null;
-  status: 'new' | 'reviewed' | 'contacted' | 'shortlisted' | 'hired' | 'hidden';
+  status: string; // Changed from union to string for dynamic pipeline stages
   school_notes: string | null;
   created_at: string;
   updated_at: string;
@@ -48,6 +48,7 @@ export interface CandidateMatchView {
   profile_photo_url: string | null;
   resume_url: string | null;
   portfolio_url: string | null;
+  application_id?: string; // Optional: ID of the application if this candidate came from an application
 }
 
 export interface JobWithMatches extends Job {

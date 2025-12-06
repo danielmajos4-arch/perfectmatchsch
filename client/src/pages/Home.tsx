@@ -4,13 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Layout } from '@/components/Layout';
 import { Briefcase, MessageCircle, Search, GraduationCap } from 'lucide-react';
-import { PromotionalBanner } from '@/components/PromotionalBanner';
 import { HeroSearch } from '@/components/HeroSearch';
 import { TrustBadges } from '@/components/TrustBadges';
+import { ImageSlideshow } from '@/components/ImageSlideshow';
 // Images moved to public folder for Vercel deployment
 const logoUrl = '/images/logo.png';
-const featuresImageUrl = 'https://placehold.co/800x600/4F46E5/FFFFFF?text=PerfectMatch+Schools';
-const heroBackgroundImage = 'https://placehold.co/1920x1080/1E293B/FFFFFF?text=Find+Your+Perfect+Match';
+const featuresImageUrl = '/images/features.png';
+const heroBackgroundImage = '/images/hero-background.png';
+const slideshowImages = [
+  '/images/slideshow-1.png',
+  '/images/slideshow-2.png',
+  '/images/slideshow-3.png',
+];
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -31,22 +36,20 @@ export default function Home() {
 
   return (
     <Layout>
-    <div className="min-h-screen bg-background">
-        {/* Promotional Banner */}
-        <PromotionalBanner />
-
+    <div className="min-h-screen bg-background dark:bg-background">
         {/* Hero Section - Upwork Style with Rounded Container */}
         <div className="px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">
           <section className="relative min-h-[500px] sm:min-h-[600px] md:min-h-[700px] lg:min-h-[800px] flex items-center overflow-hidden rounded-2xl md:rounded-3xl shadow-2xl">
-            {/* Background with Gradient (replacing image for deployment) */}
-            <div className="absolute inset-0 overflow-hidden rounded-2xl md:rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-              {/* Optional: Add pattern overlay for visual interest */}
-              <div className="absolute inset-0 opacity-10" style={{
-                backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)',
-                backgroundSize: '40px 40px'
-              }}></div>
-              {/* Dark overlay for text readability */}
-              <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/50"></div>
+            {/* Background Slideshow with Overlay */}
+            <div className="absolute inset-0 overflow-hidden rounded-2xl md:rounded-3xl bg-background dark:bg-background">
+              <ImageSlideshow 
+                images={slideshowImages}
+                interval={6000} // 6 seconds between transitions
+                transitionDuration={3000} // 3 seconds fade for slow-mo effect
+                className="w-full h-full"
+              />
+              {/* Dark overlay for text readability - adjusted for dark mode */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/50 to-black/60 dark:from-black/40 dark:via-black/30 dark:to-black/40"></div>
         </div>
 
             {/* Content Container - Text Overlay with Rounded Container */}
@@ -68,11 +71,11 @@ export default function Home() {
                 </div>
 
                 {/* Search Component - Rounded Container like Upwork */}
-                <div className="bg-gray-900/95 backdrop-blur-md border border-gray-700/70 rounded-2xl p-4 md:p-5 lg:p-6 xl:p-8 shadow-2xl ring-1 ring-gray-800/50">
+                <div className="bg-gray-900/95 dark:bg-gray-950/95 backdrop-blur-md border border-gray-700/70 dark:border-gray-600/50 rounded-2xl p-4 md:p-5 lg:p-6 xl:p-8 shadow-2xl ring-1 ring-gray-800/50 dark:ring-gray-700/50">
                   <HeroSearch />
                   
                   {/* Trust Badges - Below Search */}
-                  <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-gray-700/50">
+                  <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-gray-700/50 dark:border-gray-600/50">
                     <TrustBadges />
                   </div>
                 </div>
@@ -101,9 +104,9 @@ export default function Home() {
       </div>
 
       {/* Features */}
-      <div className="px-4 py-16 md:py-24 bg-muted/50">
+      <div className="px-4 py-16 md:py-24 bg-muted/50 dark:bg-muted/30">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-foreground mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-center text-foreground dark:text-foreground mb-12">
             Why Choose PerfectMatchSchools?
           </h2>
             
@@ -164,10 +167,10 @@ export default function Home() {
 
       {/* CTA Section */}
       <div className="px-4 py-16 md:py-24 max-w-4xl mx-auto text-center">
-        <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+        <h2 className="text-3xl md:text-4xl font-bold text-foreground dark:text-foreground mb-4">
           Ready to Find Your Dream Teaching Position?
         </h2>
-        <p className="text-lg text-muted-foreground mb-8">
+        <p className="text-lg text-muted-foreground dark:text-muted-foreground mb-8">
           Join 1,000+ educators who have found their perfect match
         </p>
           <Link href="/role-selection">

@@ -27,7 +27,11 @@ import { Bell, Check, CheckCheck, X, Star, User, FileText, MessageCircle, Trophy
 import { supabase } from '@/lib/supabaseClient';
 import { formatDistanceToNow } from 'date-fns';
 
-export function NotificationCenter() {
+interface NotificationCenterProps {
+  className?: string;
+}
+
+export function NotificationCenter({ className }: NotificationCenterProps) {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -161,7 +165,7 @@ export function NotificationCenter() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-10 w-10"
+          className={`relative h-10 w-10 ${className || ''}`}
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (

@@ -4,103 +4,85 @@
  * Kanban board view for managing candidates through the hiring pipeline
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Users, 
-  TrendingUp, 
-  Clock, 
-  CheckCircle2, 
+import {
+  Users,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
   XCircle,
   Eye,
   FileText,
   Mail,
   MoreVertical,
-  GripVertical
+  GripVertical,
+  Plus
 } from 'lucide-react';
 import { getSchoolCandidates, updateCandidateStatus } from '@/lib/matchingService';
+import { getPipelineStages } from '@/lib/pipelineService';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { CandidateMatchView } from '@shared/matching';
+import type { PipelineStage } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
+import { CandidateDetailView } from './CandidateDetailView';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface CandidatePipelineViewProps {
   schoolId: string;
   jobId?: string;
 }
 
-type CandidateStatus = 'new' | 'reviewed' | 'contacted' | 'shortlisted' | 'hired' | 'rejected';
+// Map standard stage names to icons and colors for visual consistency
+const STAGE_CONFIG: Record<string, { icon: any, color: string, bgColor: string }> = {
+  'New': { icon: Users, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-900/20' },
+  'Reviewed': { icon: Eye, color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-900/20' },
+  'Phone Screen': { icon: Mail, color: 'text-orange-600 dark:text-orange-400', bgColor: 'bg-orange-50 dark:bg-orange-900/20' },
+  'Interview': { icon: Users, color: 'text-indigo-600 dark:text-indigo-400', bgColor: 'bg-indigo-50 dark:bg-indigo-900/20' },
+  'Offer': { icon: CheckCircle2, color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-50 dark:bg-green-900/20' },
+  'Hired': { icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-50 dark:bg-emerald-900/20' },
+  'Rejected': { icon: XCircle, color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-900/20' },
+};
 
-interface StatusColumn {
-  id: CandidateStatus;
-  label: string;
-  icon: typeof Users;
-  color: string;
-  bgColor: string;
-}
-
-const statusColumns: StatusColumn[] = [
-  {
-    id: 'new',
-    label: 'New',
-    icon: Users,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-  },
-  {
-    id: 'reviewed',
-    label: 'Reviewed',
-    icon: Eye,
-    color: 'text-purple-600 dark:text-purple-400',
-    bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-  },
-  {
-    id: 'contacted',
-    label: 'Contacted',
-    icon: Mail,
-    color: 'text-orange-600 dark:text-orange-400',
-    bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-  },
-  {
-    id: 'shortlisted',
-    label: 'Shortlisted',
-    icon: CheckCircle2,
-    color: 'text-green-600 dark:text-green-400',
-    bgColor: 'bg-green-50 dark:bg-green-900/20',
-  },
-  {
-    id: 'hired',
-    label: 'Hired',
-    icon: TrendingUp,
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-50 dark:bg-emerald-900/20',
-  },
-  {
-    id: 'rejected',
-    label: 'Rejected',
-    icon: XCircle,
-    color: 'text-red-600 dark:text-red-400',
-    bgColor: 'bg-red-50 dark:bg-red-900/20',
-  },
-];
+const DEFAULT_STAGE_CONFIG = { icon: Users, color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-50 dark:bg-gray-900/20' };
 
 export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineViewProps) {
   const { toast } = useToast();
   const [draggedCandidate, setDraggedCandidate] = useState<CandidateMatchView | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateMatchView | null>(null);
+  const [bulkActionStage, setBulkActionStage] = useState<string | null>(null);
+  const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
 
-  const { data: candidates, isLoading } = useQuery<CandidateMatchView[]>({
+  // Fetch pipeline stages
+  const { data: stages, isLoading: stagesLoading } = useQuery<PipelineStage[]>({
+    queryKey: ['pipeline-stages', schoolId, jobId],
+    queryFn: () => getPipelineStages(schoolId, jobId),
+    enabled: !!schoolId,
+  });
+
+  // Fetch candidates
+  const { data: candidates, isLoading: candidatesLoading } = useQuery<CandidateMatchView[]>({
     queryKey: ['/api/candidates', schoolId, jobId],
     queryFn: async () => {
       return await getSchoolCandidates(schoolId, { jobId });
@@ -109,7 +91,7 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ candidateId, status }: { candidateId: string; status: CandidateStatus }) => {
+    mutationFn: async ({ candidateId, status }: { candidateId: string; status: string }) => {
       return await updateCandidateStatus(candidateId, status);
     },
     onSuccess: () => {
@@ -136,7 +118,7 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
     e.preventDefault();
   };
 
-  const handleDrop = (e: React.DragEvent, targetStatus: CandidateStatus) => {
+  const handleDrop = (e: React.DragEvent, targetStatus: string) => {
     e.preventDefault();
     if (draggedCandidate && draggedCandidate.status !== targetStatus) {
       updateStatusMutation.mutate({
@@ -147,7 +129,7 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
     setDraggedCandidate(null);
   };
 
-  const handleStatusChange = (candidate: CandidateMatchView, newStatus: CandidateStatus) => {
+  const handleStatusChange = (candidate: CandidateMatchView, newStatus: string) => {
     if (candidate.status !== newStatus) {
       updateStatusMutation.mutate({
         candidateId: candidate.id,
@@ -156,37 +138,33 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
     }
   };
 
-  const getCandidatesByStatus = (status: CandidateStatus) => {
-    return candidates?.filter(c => c.status === status) || [];
+  // Helper to normalize status strings for comparison (e.g., "Phone Screen" -> "phone_screen" or vice versa)
+  // For now, we assume the DB stores the stage name directly or a slug. 
+  // The matching service likely expects specific enum values, but we're moving to dynamic strings.
+  // We'll need to ensure the backend supports arbitrary status strings or we map them.
+  // For Phase 1, we'll assume the status column in applications table is now a TEXT field that matches stage names.
+
+  const getCandidatesByStatus = (stageName: string) => {
+    if (!candidates) return [];
+    // Case-insensitive comparison and handling of legacy status values
+    return candidates.filter(c => {
+      const s1 = (c.status || '').toLowerCase().replace(/_/g, ' ');
+      const s2 = stageName.toLowerCase().replace(/_/g, ' ');
+      return s1 === s2;
+    });
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const stats = {
-    total: candidates?.length || 0,
-    new: getCandidatesByStatus('new').length,
-    shortlisted: getCandidatesByStatus('shortlisted').length,
-    hired: getCandidatesByStatus('hired').length,
-  };
-
-  if (isLoading) {
+  if (stagesLoading || candidatesLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-muted-foreground">Loading candidates...</div>
+        <div className="text-muted-foreground">Loading pipeline...</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header with Stats - Mobile First */}
+      {/* Header with Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">Candidate Pipeline</h2>
@@ -195,56 +173,69 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
             <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{stats.total} Total</span>
+            <span className="text-sm font-medium">{candidates?.length || 0} Total</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{stats.new} New</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/20 rounded-lg">
-            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-            <span className="text-sm font-medium text-green-600 dark:text-green-400">{stats.shortlisted} Shortlisted</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-            <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{stats.hired} Hired</span>
-          </div>
+          {/* Add "Add Stage" button here in future */}
         </div>
       </div>
 
-      {/* Kanban Board - Mobile: Scroll horizontally, Desktop: Full width */}
+      {/* Kanban Board */}
       <div className="overflow-x-auto pb-4">
         <div className="flex gap-4 min-w-max sm:min-w-0">
-          {statusColumns.map((column) => {
-            const columnCandidates = getCandidatesByStatus(column.id);
-            const Icon = column.icon;
+          {stages?.map((stage) => {
+            const columnCandidates = getCandidatesByStatus(stage.name);
+            const config = STAGE_CONFIG[stage.name] || DEFAULT_STAGE_CONFIG;
+            const Icon = config.icon;
 
             return (
               <div
-                key={column.id}
+                key={stage.id}
                 className="flex-shrink-0 w-72 sm:w-80"
                 onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, column.id)}
+                onDrop={(e) => handleDrop(e, stage.name)} // Passing stage name as status
               >
-                <Card className={`h-full ${column.bgColor} border-2`}>
-                  <CardHeader className={`pb-3 ${column.bgColor}`}>
+                <Card className={`h-full ${config.bgColor} border-2`}>
+                  <CardHeader className="p-4 pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Icon className={`h-5 w-5 ${column.color}`} />
-                        <CardTitle className={`text-sm font-semibold ${column.color}`}>
-                          {column.label}
-                        </CardTitle>
-                        <Badge variant="secondary" className="text-xs">
-                          {columnCandidates.length}
-                        </Badge>
+                        <div className={`p-2 rounded-lg ${config.bgColor}`}>
+                          <Icon className={`h-4 w-4 ${config.color}`} />
+                        </div>
+                        <div>
+                          <CardTitle className="text-sm font-semibold">{stage.name}</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {columnCandidates.length} candidate{columnCandidates.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
                       </div>
+                      {columnCandidates.length > 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setBulkActionStage(stage.name);
+                                setShowBulkRejectDialog(true);
+                              }}
+                              className="text-destructive"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Reject All
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="p-3">
                     <ScrollArea className="h-[600px] sm:h-[700px]">
                       <div className="space-y-3">
                         {columnCandidates.length === 0 ? (
-                          <div className="text-center py-8 text-sm text-muted-foreground">
+                          <div className="text-center py-8 text-sm text-muted-foreground opacity-70">
                             No candidates
                           </div>
                         ) : (
@@ -268,6 +259,56 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
           })}
         </div>
       </div>
+
+      {selectedCandidate && (
+        <CandidateDetailView
+          candidate={selectedCandidate}
+          isOpen={!!selectedCandidate}
+          onClose={() => setSelectedCandidate(null)}
+        />
+      )}
+
+      {/* Bulk Reject Dialog */}
+      <AlertDialog open={showBulkRejectDialog} onOpenChange={setShowBulkRejectDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject All Candidates?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reject all {candidates?.filter(c => c.status === bulkActionStage).length || 0} candidates in the "{bulkActionStage}" column.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                const candidatesToReject = candidates?.filter(c => c.status === bulkActionStage) || [];
+                try {
+                  await Promise.all(
+                    candidatesToReject.map(c => updateCandidateStatus(c.application_id!, 'Rejected'))
+                  );
+                  queryClient.invalidateQueries({ queryKey: ['/api/candidates'] });
+                  toast({
+                    title: 'Candidates rejected',
+                    description: `${candidatesToReject.length} candidate(s) have been rejected.`,
+                  });
+                } catch (error: any) {
+                  toast({
+                    title: 'Failed to reject candidates',
+                    description: error.message,
+                    variant: 'destructive',
+                  });
+                }
+                setShowBulkRejectDialog(false);
+                setBulkActionStage(null);
+              }}
+            >
+              Reject All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -275,7 +316,7 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
 interface CandidateCardProps {
   candidate: CandidateMatchView;
   onDragStart: (candidate: CandidateMatchView) => void;
-  onStatusChange: (candidate: CandidateMatchView, status: CandidateStatus) => void;
+  onStatusChange: (candidate: CandidateMatchView, status: string) => void;
   onSelect: (candidate: CandidateMatchView) => void;
   isDragging: boolean;
 }
@@ -354,8 +395,8 @@ function CandidateCard({
                 candidate.match_score >= 80
                   ? 'default'
                   : candidate.match_score >= 60
-                  ? 'secondary'
-                  : 'outline'
+                    ? 'secondary'
+                    : 'outline'
               }
               className="text-xs"
             >

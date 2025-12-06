@@ -27,6 +27,7 @@ export interface Job {
   posted_at: string;
   is_active: boolean;
   archetype_tags?: string[]; // Added for Sprint 6 matching
+  application_requirements?: Record<string, boolean>; // Added for configurable application fields
 }
 
 export interface Application {
@@ -36,6 +37,7 @@ export interface Application {
   cover_letter: string;
   status: string;
   applied_at: string;
+  desired_salary?: string; // Added for teacher's desired salary
 }
 
 export interface Conversation {
@@ -78,12 +80,14 @@ export interface InsertJob {
   school_name: string;
   school_logo?: string | null;
   archetype_tags?: string[]; // Added for Sprint 6 matching
+  application_requirements?: Record<string, boolean>; // Added for configurable application fields
 }
 
 export interface InsertApplication {
   job_id: string;
   teacher_id: string;
   cover_letter: string;
+  desired_salary?: string; // Added for teacher's desired salary
 }
 
 export interface InsertConversation {
@@ -152,6 +156,12 @@ export interface School {
   logo_url: string | null;
   profile_complete: boolean;
   created_at: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejected_at?: string | null;
+  rejection_reason?: string | null;
+  verification_notes?: string | null;
 }
 
 export interface InsertSchool {
@@ -163,6 +173,12 @@ export interface InsertSchool {
   website?: string | null;
   logo_url?: string | null;
   profile_complete?: boolean;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  approved_at?: string | null;
+  approved_by?: string | null;
+  rejected_at?: string | null;
+  rejection_reason?: string | null;
+  verification_notes?: string | null;
 }
 
 // Quiz interfaces
@@ -244,3 +260,86 @@ export interface InsertEmailTemplate {
 
 // Export matching types
 export * from './matching';
+
+// ATS Interfaces
+
+export interface PipelineStage {
+  id: string;
+  job_id: string | null; // null means default for school
+  school_id: string;
+  name: string;
+  order_index: number;
+  type: 'system' | 'custom';
+  created_at: string;
+}
+
+export interface InsertPipelineStage {
+  job_id?: string | null;
+  school_id: string;
+  name: string;
+  order_index: number;
+  type: 'system' | 'custom';
+}
+
+export interface HiringTeamMember {
+  id: string;
+  job_id: string;
+  user_id: string;
+  role: 'hiring_manager' | 'reviewer' | 'observer';
+  created_at: string;
+}
+
+export interface InsertHiringTeamMember {
+  job_id: string;
+  user_id: string;
+  role: 'hiring_manager' | 'reviewer' | 'observer';
+}
+
+export interface ApplicationComment {
+  id: string;
+  application_id: string;
+  user_id: string;
+  content: string;
+  visibility: 'team' | 'private' | 'admin_only';
+  created_at: string;
+}
+
+export interface InsertApplicationComment {
+  application_id: string;
+  user_id: string;
+  content: string;
+  visibility?: 'team' | 'private' | 'admin_only';
+}
+
+export interface ApplicationRating {
+  id: string;
+  application_id: string;
+  user_id: string;
+  category: 'skills' | 'culture' | 'overall';
+  score: number;
+  created_at: string;
+}
+
+export interface InsertApplicationRating {
+  application_id: string;
+  user_id: string;
+  category: 'skills' | 'culture' | 'overall';
+  score: number;
+}
+
+export interface Offer {
+  id: string;
+  application_id: string;
+  created_by: string;
+  status: 'draft' | 'approval_pending' | 'extended' | 'accepted' | 'declined';
+  salary_amount: number | null;
+  start_date: string | null;
+  benefits_summary: string | null;
+  additional_terms: string | null;
+  expiration_date: string | null;
+  offer_letter_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type InsertOffer = Omit<Offer, 'id' | 'created_at' | 'updated_at'>;

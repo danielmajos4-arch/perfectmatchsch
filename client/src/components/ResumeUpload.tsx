@@ -11,12 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Upload, 
-  FileText, 
-  X, 
-  Download, 
-  Eye, 
+import {
+  Upload,
+  FileText,
+  X,
+  Download,
+  Eye,
   CheckCircle2,
   AlertCircle,
   Loader2
@@ -24,12 +24,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
 import { queryClient } from '@/lib/queryClient';
-import { 
-  uploadFile, 
-  deleteFile, 
-  formatFileSize, 
+import {
+  uploadFile,
+  deleteFile,
+  formatFileSize,
   validateFile,
-  type FileType 
+  type FileType
 } from '@/lib/fileUploadService';
 import type { Teacher } from '@shared/schema';
 
@@ -210,64 +210,77 @@ export function ResumeUpload({ teacher, userId, onUpdate }: ResumeUploadProps) {
         {teacher.resume_url ? (
           <div className="space-y-4">
             {/* Current Resume */}
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <FileText className="h-5 w-5 text-primary" />
+            <div className="group relative overflow-hidden rounded-xl border border-border/50 bg-background transition-all hover:shadow-md hover:border-primary/20">
+              <div className="absolute top-0 left-0 w-1 h-full bg-primary/50" />
+              <div className="p-5 flex flex-col gap-4">
+
+                {/* Header: File Name & Status */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1 min-w-0">
+                    <h4 className="font-semibold text-foreground truncate text-base" title={getFileName(teacher.resume_url)}>
+                      {getFileName(teacher.resume_url)}
+                    </h4>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px] uppercase tracking-wider font-medium bg-green-50 text-green-700 hover:bg-green-100 border-green-200">
+                        Uploaded
+                      </Badge>
+                      <span>•</span>
+                      <span className="whitespace-nowrap">PDF Document</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleDelete}
+                    className="h-8 w-8 -mr-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+                    title="Delete Resume"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">
-                    {getFileName(teacher.resume_url)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Resume uploaded
-                  </p>
+
+                {/* Body: Icon & Actions */}
+                <div className="flex items-center justify-between gap-4 pt-2 border-t border-border/50">
+                  <div className="h-10 w-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0 ring-1 ring-red-100">
+                    <FileText className="h-5 w-5" />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      asChild
+                      className="h-9 px-3 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                    >
+                      <a href={teacher.resume_url} target="_blank" rel="noopener noreferrer">
+                        <Eye className="h-4 w-4 mr-2" />
+                        View
+                      </a>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="h-9 px-3 border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                    >
+                      <a href={teacher.resume_url} download>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </a>
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="gap-2"
-                >
-                  <a href={teacher.resume_url} target="_blank" rel="noopener noreferrer">
-                    <Eye className="h-4 w-4" />
-                    <span className="hidden sm:inline">View</span>
-                  </a>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                  className="gap-2"
-                >
-                  <a href={teacher.resume_url} download>
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Download</span>
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDelete}
-                  className="gap-2 text-destructive hover:text-destructive"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
               </div>
             </div>
-
             {/* Replace Resume */}
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                isDragging
-                  ? 'border-primary bg-primary/5'
-                  : 'border-border hover:border-primary/50'
-              }`}
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${isDragging
+                ? 'border-primary bg-primary/5'
+                : 'border-border hover:border-primary/50'
+                }`}
             >
               <Upload className={`h-8 w-8 mx-auto mb-2 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
               <p className="text-sm font-medium mb-1">
@@ -303,11 +316,10 @@ export function ResumeUpload({ teacher, userId, onUpdate }: ResumeUploadProps) {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              isDragging
-                ? 'border-primary bg-primary/5'
-                : 'border-border hover:border-primary/50'
-            }`}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
+              ? 'border-primary bg-primary/5'
+              : 'border-border hover:border-primary/50'
+              }`}
           >
             <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
             <h3 className="text-lg font-semibold mb-2">

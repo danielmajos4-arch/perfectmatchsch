@@ -24,13 +24,36 @@ export async function findMatchingTeachers(job: {
   archetype_tags?: string[];
 }): Promise<MatchingTeacher[]> {
   try {
-    // Build query to find matching teachers
+    // Build query to find matching teachers with timeout
+    const queryTimeout = 8000; // 8 seconds
+    const queryController = new AbortController();
+    const queryTimeoutId = setTimeout(() => queryController.abort(), queryTimeout);
+    
     let query = supabase
       .from('teachers')
       .select('user_id, id, full_name, subjects, grade_levels, location, archetype, profile_complete')
-      .eq('profile_complete', true);
+      .eq('profile_complete', true)
+      .abortSignal(queryController.signal);
 
-    const { data: teachers, error } = await query;
+    const queryPromise = query;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Teacher query timed out')), queryTimeout);
+    });
+
+    let teachers, error;
+    try {
+      const result = await Promise.race([queryPromise, timeoutPromise]) as any;
+      clearTimeout(queryTimeoutId);
+      teachers = result.data;
+      error = result.error;
+    } catch (queryError: any) {
+      clearTimeout(queryTimeoutId);
+      if (queryError.name === 'AbortError' || queryError.message?.includes('timed out')) {
+        console.warn('findMatchingTeachers: Query timed out, returning empty array');
+        return [];
+      }
+      throw queryError;
+    }
 
     if (error) {
       console.error('Error fetching teachers for matching:', error);

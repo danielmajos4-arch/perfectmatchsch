@@ -13,6 +13,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   role: UserRole | null;
+  refreshRole: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   loading: true,
   role: null,
+  refreshRole: async () => { },
 });
 
 // Helper to validate if a role is valid
@@ -31,16 +33,16 @@ const isValidRole = (role: unknown): role is UserRole => {
 const getRoleFromMetadata = (user: User): UserRole | null => {
   // Try multiple possible locations for role in user_metadata
   const metadataRole = user.user_metadata?.role;
-  
+
   console.log('[AuthContext] Checking user_metadata for role:', {
     user_metadata: user.user_metadata,
     metadataRole,
   });
-  
+
   if (isValidRole(metadataRole)) {
     return metadataRole;
   }
-  
+
   return null;
 };
 
@@ -55,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch role from public.users table, create record if missing
   const fetchOrCreateUserRole = async (currentUser: User): Promise<UserRole | null> => {
     const userId = currentUser.id;
-    
+
     try {
       // First, try to fetch from users table
       const { data, error } = await supabase
@@ -74,45 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // No record in users table - check user_metadata for role
       const metadataRole = getRoleFromMetadata(currentUser);
-      
+
       if (metadataRole) {
         console.log('[AuthContext] Found role in user_metadata:', metadataRole);
-        
-        // Create the users table entry if it doesn't exist
-        if (!data) {
-          console.log('[AuthContext] Creating users table entry for user:', userId);
-          
-          const { error: insertError } = await supabase
-            .from('users')
-            .insert({
-              id: userId,
-              email: currentUser.email || '',
-              role: metadataRole,
-              full_name: currentUser.user_metadata?.full_name || '',
-            });
+        console.log('[AuthContext] User record will be created during onboarding');
+        // Skip creating user record here - it will be created when they save their profile
+        // This avoids RLS policy conflicts during auth initialization
 
-          if (insertError) {
-            // Ignore duplicate key errors (record might have been created by another process)
-            if (insertError.code !== '23505') {
-              console.error('[AuthContext] Error creating users record:', insertError);
-            }
-          } else {
-            console.log('[AuthContext] Successfully created users table entry');
-          }
-        } else {
-          // Record exists but role is invalid/missing - update it
-          console.log('[AuthContext] Updating users table with role from metadata:', metadataRole);
-          
-          const { error: updateError } = await supabase
-            .from('users')
-            .update({ role: metadataRole })
-            .eq('id', userId);
-
-          if (updateError) {
-            console.error('[AuthContext] Error updating users record:', updateError);
-          }
-        }
-        
         return metadataRole;
       }
 
@@ -120,15 +90,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     } catch (err) {
       console.error('[AuthContext] Error in fetchOrCreateUserRole:', err);
-      
+
       // Last resort: try to get role from metadata even if DB operation failed
       const fallbackRole = getRoleFromMetadata(currentUser);
       if (fallbackRole) {
         console.log('[AuthContext] Using fallback role from metadata:', fallbackRole);
         return fallbackRole;
       }
-      
+
       return null;
+    }
+  };
+
+  // Function to manually refresh the role (for retry functionality)
+  const refreshRole = async () => {
+    if (!user) {
+      console.log('[AuthContext] refreshRole called but no user');
+      return;
+    }
+
+    console.log('[AuthContext] Manually refreshing role for user:', user.id);
+    try {
+      const userRole = await fetchOrCreateUserRole(user);
+      console.log('[AuthContext] Role refreshed:', userRole);
+      setRole(userRole);
+    } catch (err) {
+      console.error('[AuthContext] Error refreshing role:', err);
     }
   };
 
@@ -147,11 +134,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initializeAuth = async () => {
       // Mark that we're initializing to prevent race with onAuthStateChange
       isInitializing.current = true;
-      
+
       try {
         console.log('[AuthContext] Starting auth initialization...');
         const { data: { session }, error } = await supabase.auth.getSession();
-        
+
         if (error) {
           console.error('[AuthContext] Error getting session:', error);
           // Continue without session on error
@@ -162,17 +149,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         console.log('[AuthContext] Got session:', { hasSession: !!session, hasUser: !!session?.user });
-        
+
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
           console.log('[AuthContext] Fetching role for user:', session.user.id);
           const userRole = await fetchOrCreateUserRole(session.user);
           console.log('[AuthContext] Role fetched:', userRole);
           setRole(userRole);
         }
-        
+
         isInitializing.current = false;
         initCompleted.current = true;
         setLoading(false);
@@ -192,23 +179,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[AuthContext] onAuthStateChange:', { event, hasSession: !!session });
-      
+
       // Skip if we're still in the initial auth phase to prevent race condition
       if (isInitializing.current) {
         console.log('[AuthContext] Skipping onAuthStateChange - still initializing');
         return;
       }
-      
+
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         const userRole = await fetchOrCreateUserRole(session.user);
         setRole(userRole);
       } else {
         setRole(null);
       }
-      
+
       setLoading(false);
     });
 
@@ -219,7 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, role }}>
+    <AuthContext.Provider value={{ user, session, loading, role, refreshRole }}>
       {children}
     </AuthContext.Provider>
   );

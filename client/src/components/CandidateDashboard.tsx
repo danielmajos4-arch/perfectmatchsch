@@ -591,16 +591,52 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
                       size="sm"
                       className="h-11 gap-2"
                       onClick={async () => {
-                        // Fetch application data
-                        const { data: application } = await supabase
-                          .from('applications')
-                          .select('*, job:jobs(*), teacher:teachers(*)')
-                          .eq('id', candidate.id)
-                          .single();
-                        
-                        if (application) {
-                          setSelectedApplication(application as any);
-                          setShowEmailModal(true);
+                        try {
+                          // Fetch application by job_id and teacher_id
+                          let application = null;
+                          
+                          if (candidate.application_id) {
+                            const { data: appData } = await supabase
+                              .from('applications')
+                              .select('*, job:jobs(*), teacher:teachers!applications_teacher_id_fkey(*)')
+                              .eq('id', candidate.application_id)
+                              .maybeSingle();
+                            application = appData;
+                          }
+                          
+                          if (!application && candidate.job_id && candidate.teacher_id) {
+                            const { data: appData } = await supabase
+                              .from('applications')
+                              .select('*, job:jobs(*), teacher:teachers!applications_teacher_id_fkey(*)')
+                              .eq('job_id', candidate.job_id)
+                              .eq('teacher_id', candidate.teacher_id)
+                              .maybeSingle();
+                            application = appData;
+                          }
+                          
+                          if (application) {
+                            const job = Array.isArray(application.job) ? application.job[0] : application.job;
+                            const teacher = Array.isArray(application.teacher) ? application.teacher[0] : application.teacher;
+                            setSelectedApplication({
+                              ...application,
+                              job: job as Job,
+                              teacher: teacher as Teacher,
+                            } as any);
+                            setShowEmailModal(true);
+                          } else {
+                            toast({
+                              title: 'Application not found',
+                              description: 'Could not find application data.',
+                              variant: 'destructive',
+                            });
+                          }
+                        } catch (error: any) {
+                          console.error('Error fetching application:', error);
+                          toast({
+                            title: 'Error',
+                            description: 'Failed to load application data.',
+                            variant: 'destructive',
+                          });
                         }
                       }}
                     >
@@ -720,56 +756,74 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
                         variant="ghost"
                         size="icon"
                         onClick={async () => {
-                          // Fetch application data with job and teacher
-                          const { data: application, error } = await supabase
-                            .from('applications')
-                            .select(`
-                              *,
-                              job:jobs(*),
-                              teacher:teachers(*)
-                            `)
-                            .eq('id', candidate.application_id || candidate.id)
-                            .single();
-                          
-                          if (error) {
+                          try {
+                            // Fetch application by job_id and teacher_id (more reliable than by ID)
+                            let application = null;
+                            
+                            if (candidate.application_id) {
+                              // Try to fetch by application_id first
+                              const { data: appData, error: appError } = await supabase
+                                .from('applications')
+                                .select(`
+                                  *,
+                                  job:jobs(*),
+                                  teacher:teachers!applications_teacher_id_fkey(*)
+                                `)
+                                .eq('id', candidate.application_id)
+                                .maybeSingle();
+                              
+                              if (!appError && appData) {
+                                application = appData;
+                              }
+                            }
+                            
+                            // If not found by application_id, try by job_id and teacher_id
+                            if (!application && candidate.job_id && candidate.teacher_id) {
+                              const { data: appData, error: appError } = await supabase
+                                .from('applications')
+                                .select(`
+                                  *,
+                                  job:jobs(*),
+                                  teacher:teachers!applications_teacher_id_fkey(*)
+                                `)
+                                .eq('job_id', candidate.job_id)
+                                .eq('teacher_id', candidate.teacher_id)
+                                .maybeSingle();
+                              
+                              if (!appError && appData) {
+                                application = appData;
+                              }
+                            }
+                            
+                            if (application) {
+                              // Ensure job and teacher data are properly structured
+                              const job = Array.isArray(application.job) 
+                                ? application.job[0] 
+                                : application.job;
+                              const teacher = Array.isArray(application.teacher)
+                                ? application.teacher[0]
+                                : application.teacher;
+                              
+                              setSelectedApplication({
+                                ...application,
+                                job: job as Job,
+                                teacher: teacher as Teacher,
+                              } as any);
+                              setShowEmailModal(true);
+                            } else {
+                              toast({
+                                title: 'Application not found',
+                                description: 'Could not find application data for this candidate.',
+                                variant: 'destructive',
+                              });
+                            }
+                          } catch (error: any) {
                             console.error('Error fetching application:', error);
                             toast({
                               title: 'Error',
-                              description: 'Failed to load application data.',
+                              description: error.message || 'Failed to load application data.',
                               variant: 'destructive',
                             });
-                            return;
-                          }
-                          
-                          if (application) {
-                            // Also fetch job if not included
-                            let job = application.job;
-                            if (!job && candidate.job_id) {
-                              const { data: jobData } = await supabase
-                                .from('jobs')
-                                .select('*')
-                                .eq('id', candidate.job_id)
-                                .single();
-                              job = jobData;
-                            }
-                            
-                            // Also fetch teacher if not included
-                            let teacher = application.teacher;
-                            if (!teacher && candidate.teacher_id) {
-                              const { data: teacherData } = await supabase
-                                .from('teachers')
-                                .select('*')
-                                .eq('user_id', candidate.teacher_id)
-                                .single();
-                              teacher = teacherData;
-                            }
-                            
-                            setSelectedApplication({
-                              ...application,
-                              job: job as Job,
-                              teacher: teacher as Teacher,
-                            } as any);
-                            setShowEmailModal(true);
                           }
                         }}
                         title="Email Applicant"

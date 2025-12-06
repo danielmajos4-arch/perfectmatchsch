@@ -82,7 +82,7 @@ export default function JobDetail() {
       
       try {
         const result = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
-        return result.conversation;
+      return result.conversation;
       } catch (error: any) {
         if (error.message === 'Conversation creation timed out. Please try again.') {
           throw new Error('Starting conversation took too long. Please try again.');

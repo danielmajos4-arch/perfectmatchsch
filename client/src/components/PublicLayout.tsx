@@ -27,10 +27,10 @@ export function PublicLayout({ children }: PublicLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background dark:bg-background">
       {/* Desktop Header - Pill Shaped Navbar */}
       <header className="hidden md:block fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-5xl px-4">
-        <div className="bg-white/95 backdrop-blur-lg border border-gray-200 rounded-full shadow-lg px-6 py-3 flex items-center justify-between">
+        <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border border-gray-200 dark:border-gray-700 rounded-full shadow-lg px-6 py-3 flex items-center justify-between">
           <Link 
             href="/" 
             className="flex items-center gap-2 hover:opacity-80 transition-opacity" 
@@ -48,7 +48,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           
           <nav className="flex items-center gap-2 md:gap-3">
             <Link href="/login">
-              <Button variant="ghost" size="sm" className="text-xs md:text-sm font-medium rounded-full px-3 md:px-5 h-8 md:h-9 hover:bg-gray-100 text-gray-700">
+              <Button variant="ghost" size="sm" className="text-xs md:text-sm font-medium rounded-full px-3 md:px-5 h-8 md:h-9 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
                 <span className="hidden md:inline">Sign In</span>
                 <span className="md:hidden">Login</span>
               </Button>
@@ -68,7 +68,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
 
       {/* Mobile Header - Pill Shaped Navbar */}
       <header className="md:hidden fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-1.5rem)] max-w-md">
-        <div className="bg-white/95 backdrop-blur-lg border border-gray-200 rounded-full shadow-lg px-4 py-2.5 flex items-center justify-between">
+        <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg border border-gray-200 dark:border-gray-700 rounded-full shadow-lg px-4 py-2.5 flex items-center justify-between">
           <Link 
             href="/" 
             className="flex items-center" 
@@ -85,7 +85,7 @@ export function PublicLayout({ children }: PublicLayoutProps) {
           </Link>
           <div className="flex items-center gap-1.5">
             <Link href="/login">
-              <Button variant="ghost" size="sm" className="text-xs h-7 px-3 rounded-full text-[10px] sm:text-xs hover:bg-gray-100 text-gray-700">
+              <Button variant="ghost" size="sm" className="text-xs h-7 px-3 rounded-full text-[10px] sm:text-xs hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200">
                 Sign In
               </Button>
             </Link>

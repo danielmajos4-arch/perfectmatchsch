@@ -116,10 +116,10 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
       let existing = null;
       try {
         const { data } = await supabase
-          .from('applications')
-          .select('id, status')
-          .eq('job_id', job.id)
-          .eq('teacher_id', userData.user.id)
+        .from('applications')
+        .select('id, status')
+        .eq('job_id', job.id)
+        .eq('teacher_id', userData.user.id)
           .maybeSingle()
           .abortSignal(checkController.signal);
         existing = data;
@@ -146,9 +146,9 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
         const { error } = await supabase
           .from('applications')
           .insert({
-            job_id: job.id,
-            teacher_id: userData.user.id,
-            cover_letter: coverLetter,
+        job_id: job.id,
+        teacher_id: userData.user.id,
+        cover_letter: coverLetter,
           })
           .abortSignal(insertController.signal);
         insertError = error;
@@ -175,14 +175,14 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
       const fetchTimeoutId = setTimeout(() => fetchController.abort(), 5000);
       
       try {
-        const { data: applicationData } = await supabase
-          .from('applications')
-          .select('id')
-          .eq('job_id', job.id)
-          .eq('teacher_id', userData.user.id)
+      const { data: applicationData } = await supabase
+        .from('applications')
+        .select('id')
+        .eq('job_id', job.id)
+        .eq('teacher_id', userData.user.id)
           .single()
           .abortSignal(fetchController.signal);
-        applicationId = applicationData?.id || null;
+      applicationId = applicationData?.id || null;
         clearTimeout(fetchTimeoutId);
       } catch (fetchErr: any) {
         clearTimeout(fetchTimeoutId);
@@ -206,11 +206,11 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
           // Note: getOrCreateConversation doesn't support AbortController directly
           // We'll wrap it in a Promise.race with timeout
           const convPromise = getOrCreateConversation(
-            userData.user.id, // teacher_id
-            job.school_id,    // school_id
-            job.id           // job_id
-          );
-          
+          userData.user.id, // teacher_id
+          job.school_id,    // school_id
+          job.id           // job_id
+        );
+
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Conversation creation timeout')), 10000);
           });
@@ -237,9 +237,9 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
             await supabase
               .from('messages')
               .insert({
-                conversation_id: conversation.id,
-                sender_id: userData.user.id,
-                content: `Application submitted for ${job.title} at ${job.school_name}`,
+            conversation_id: conversation.id,
+            sender_id: userData.user.id,
+            content: `Application submitted for ${job.title} at ${job.school_name}`,
               })
               .abortSignal(msgController.signal);
             clearTimeout(msgTimeoutId);
@@ -257,37 +257,35 @@ export function ApplicationWizard({ job, matchScore, isOpen, onClose }: Applicat
 
       // Notify school about new application (non-blocking, fire-and-forget)
       if (applicationId) {
-        // Don't await - fire and forget to prevent blocking
-        notifyNewApplication(
-          job.school_id,
-          applicationId,
-          'A teacher', // Default name if fetch fails
-          job.title
-        ).catch((notifError) => {
-          console.error('Error sending notification:', notifError);
-        });
-        
-        // Try to get teacher name in background (non-blocking)
-        supabase
-          .from('teachers')
-          .select('full_name')
-          .eq('user_id', userData.user.id)
-          .maybeSingle()
+        // Fetch teacher name first, then send single notification
+        Promise.resolve(
+          supabase
+            .from('teachers')
+            .select('full_name')
+            .eq('user_id', userData.user.id)
+            .maybeSingle()
+        )
           .then(({ data: teacherData }) => {
-            if (teacherData?.full_name) {
-              // Re-notify with correct name (non-blocking)
-              notifyNewApplication(
-                job.school_id,
-                applicationId!,
-                teacherData.full_name,
-                job.title
-              ).catch(() => {
-                // Ignore errors in background notification
-              });
-            }
+            const teacherName = teacherData?.full_name || 'A teacher';
+            // Send notification with teacher name (non-blocking)
+            return notifyNewApplication(
+              job.school_id,
+              applicationId!,
+              teacherName,
+              job.title
+            );
           })
-          .catch(() => {
-            // Ignore errors in background fetch
+          .catch((notifError) => {
+            console.error('Error sending notification:', notifError);
+            // Fallback: send notification with default name if teacher fetch fails
+            notifyNewApplication(
+              job.school_id,
+              applicationId!,
+              'A teacher',
+              job.title
+            ).catch(() => {
+              // Ignore errors in fallback notification
+            });
           });
       }
       
