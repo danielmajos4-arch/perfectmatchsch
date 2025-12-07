@@ -6,12 +6,12 @@
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Inbox, 
-  Search, 
-  Briefcase, 
-  FileText, 
-  Users, 
+import {
+  Inbox,
+  Search,
+  Briefcase,
+  FileText,
+  Users,
   MessageCircle,
   Heart,
   Star,
@@ -55,14 +55,14 @@ export function EmptyState({
   const IconElement = IconComponent ? <IconComponent className="h-12 w-12" /> : icon;
 
   return (
-    <Card className={cn("p-8 md:p-12 text-center animate-fade-in", className)}>
+    <Card className={cn("p-8 md:p-12 text-center", className)}>
       <CardContent className="flex flex-col items-center justify-center space-y-4">
         {IconElement && (
-          <div className="p-4 rounded-full bg-muted/50 text-muted-foreground">
+          <div className="p-4 rounded-full bg-muted/50 text-muted-foreground animate-in zoom-in-50 duration-500">
             {IconElement}
           </div>
         )}
-        <div className="space-y-2">
+        <div className="space-y-2 animate-in slide-in-from-bottom-2 duration-500 delay-100 fill-mode-both">
           <h3 className="text-lg sm:text-xl font-semibold text-foreground">
             {title}
           </h3>
@@ -71,7 +71,7 @@ export function EmptyState({
           </p>
         </div>
         {action && (
-          <div className="pt-2">
+          <div className="pt-2 animate-in slide-in-from-bottom-2 duration-500 delay-200 fill-mode-both">
             {action.href ? (
               <Link href={action.href}>
                 <Button className="scale-on-hover">

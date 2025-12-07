@@ -29,6 +29,14 @@ import type { Application, Job, Teacher, Conversation } from '@shared/schema';
 import type { TeacherJobMatch } from '@shared/matching';
 import { formatDistanceToNow } from 'date-fns';
 import { ProfileCompletionGate } from '@/components/ProfileCompletionGate';
+import { DashboardStats } from '@/components/DashboardStats';
+import { ApplicationDetailModal } from '@/components/ApplicationDetailModal';
+import { ProfileCompletionWidget } from '@/components/ProfileCompletionWidget';
+import { RecommendedJobs } from '@/components/RecommendedJobs';
+import { ProfileAnalyticsChart } from '@/components/ProfileAnalyticsChart';
+import { getTeacherApplications, getApplicationStats } from '@/lib/applicationService';
+import { getProfileViewStats } from '@/lib/analyticsService';
+import { getSavedJobs, getSavedJobsCount } from '@/lib/savedJobsService';
 
 type ApplicationWithJob = Application & { job: Job };
 
@@ -44,20 +52,63 @@ export default function TeacherDashboard() {
     },
   });
 
-  const { data: applications, isLoading: applicationsLoading } = useQuery<ApplicationWithJob[]>({
-    queryKey: ['/api/applications', user?.id],
+  // Get teacher profile first (needed by other queries)
+  const { data: teacherProfile } = useQuery<Teacher>({
+    queryKey: ['/api/teacher-profile', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('applications')
-        .select('*, job:jobs(*)')
-        .eq('teacher_id', user?.id)
-        .order('applied_at', { ascending: false });
+        .from('teachers')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
 
       if (error) throw error;
-      return data as any;
+      return data as Teacher;
     },
     enabled: !!user?.id,
   });
+
+  const { data: applications, isLoading: applicationsLoading } = useQuery<ApplicationWithJob[]>({
+    queryKey: ['/api/applications', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return await getTeacherApplications(user.id);
+    },
+    enabled: !!user?.id,
+  });
+
+  // Get application stats
+  const { data: applicationStats } = useQuery({
+    queryKey: ['/api/application-stats', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      return await getApplicationStats(user.id);
+    },
+    enabled: !!user?.id,
+  });
+
+  // Get saved jobs count
+  const { data: savedJobsCount } = useQuery({
+    queryKey: ['/api/saved-jobs-count', teacherProfile?.id],
+    queryFn: async () => {
+      if (!teacherProfile?.id) return 0;
+      return await getSavedJobsCount(teacherProfile.id);
+    },
+    enabled: !!teacherProfile?.id,
+  });
+
+  // Get profile view stats
+  const { data: profileViewStats } = useQuery({
+    queryKey: ['/api/profile-views', teacherProfile?.id],
+    queryFn: async () => {
+      if (!teacherProfile?.id) return null;
+      return await getProfileViewStats(teacherProfile.id);
+    },
+    enabled: !!teacherProfile?.id,
+  });
+
+  // Selected application for detail modal
+  const [selectedApplication, setSelectedApplication] = useState<ApplicationWithJob | null>(null);
 
   const { toast } = useToast();
   const [selectedTab, setSelectedTab] = useState('applications');
@@ -91,22 +142,6 @@ export default function TeacherDashboard() {
       }, 100);
     }
   }, []);
-
-  // Get teacher profile to access archetype_tags
-  const { data: teacherProfile } = useQuery<Teacher>({
-    queryKey: ['/api/teacher-profile', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('*')
-        .eq('user_id', user?.id)
-        .single();
-
-      if (error) throw error;
-      return data as Teacher;
-    },
-    enabled: !!user?.id,
-  });
 
   // Get matched jobs (Sprint 6) with real-time updates
   const { data: matchedJobs, isLoading: matchesLoading } = useQuery<(TeacherJobMatch & { job: Job })[]>({
@@ -157,6 +192,74 @@ export default function TeacherDashboard() {
       supabase.removeChannel(channel);
     };
   }, [user?.id, teacherProfile?.archetype_tags]);
+
+  // Real-time subscription for application status updates
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('application-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'applications',
+          filter: `teacher_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const updatedApp = payload.new as Application;
+          queryClient.invalidateQueries({ queryKey: ['/api/applications', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['/api/application-stats', user.id] });
+          
+          // Show toast notification for status changes
+          if (updatedApp.status !== payload.old.status) {
+            const statusMessages: Record<string, string> = {
+              under_review: 'Your application is now under review! 👀',
+              interview_scheduled: 'Interview scheduled! 📅',
+              offer_made: 'Congratulations! You received an offer! 🎉',
+              rejected: 'Application status updated',
+            };
+            
+            const message = statusMessages[updatedApp.status] || 'Application status updated';
+            toast({
+              title: 'Application Update',
+              description: message,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient, toast]);
+
+  // Real-time subscription for profile views
+  useEffect(() => {
+    if (!teacherProfile?.id) return;
+
+    const channel = supabase
+      .channel('profile-views')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'profile_views',
+          filter: `teacher_id=eq.${teacherProfile.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['/api/profile-views', teacherProfile.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [teacherProfile?.id, queryClient]);
 
   // Get favorited jobs
   const { data: favoritedJobs, isLoading: favoritedLoading } = useQuery<(TeacherJobMatch & { job: Job })[]>({
@@ -266,39 +369,20 @@ export default function TeacherDashboard() {
 
   const profileCompletion = calculateProfileCompletion(teacherProfile);
 
-  const stats = [
-    {
-      label: 'Active Applications',
-      value: applications?.filter(a => a.status === 'pending' || a.status === 'under_review').length || 0,
-      icon: Clock,
+  // Calculate conversations count (active conversations)
+  const { data: conversationsCount } = useQuery({
+    queryKey: ['/api/conversations-count', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return 0;
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('teacher_id', user.id);
+      if (error) return 0;
+      return data?.length || 0;
     },
-    {
-      label: 'Total Applications',
-      value: applications?.length || 0,
-      icon: FileText,
-    },
-    {
-      label: 'Interviews',
-      value: applications?.filter(a => a.status === 'accepted').length || 0,
-      icon: CheckCircle,
-    },
-    {
-      label: 'Unread Messages',
-      value: unreadMessagesCount || 0,
-      icon: MessageCircle,
-      link: '/messages',
-    },
-    {
-      label: 'Matched Jobs',
-      value: matchedJobs?.length || 0,
-      icon: TrendingUp,
-    },
-    {
-      label: 'Favorites',
-      value: favoritedJobs?.length || 0,
-      icon: Heart,
-    },
-  ];
+    enabled: !!user?.id,
+  });
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: any; label: string }> = {
@@ -474,47 +558,89 @@ export default function TeacherDashboard() {
             )}
           </div>
 
-          {/* Stats Grid - Enhanced */}
-          {/* Stats Grid - Mobile First */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-6 mb-6 md:mb-10">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-              const isHighlighted = stat.label === 'Unread Messages' && stat.value > 0;
-              const content = (
-                <Card 
-                  key={stat.label} 
-                  className={`p-5 md:p-6 hover-elevate cursor-pointer transition-all duration-300 ${
-                    isHighlighted 
-                      ? 'bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30 shadow-lg ring-2 ring-primary/20' 
-                      : 'bg-card border-border hover:border-primary/20'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`p-2 rounded-lg ${
-                      isHighlighted 
-                        ? 'bg-primary/20 text-primary' 
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
-                      <Icon className={`h-4 w-4 md:h-5 md:w-5 ${isHighlighted ? 'text-primary' : ''}`} />
-                    </div>
-                    {isHighlighted && (
-                      <Badge variant="destructive" className="rounded-full text-xs px-2 py-0.5 animate-pulse">
-                        New
-                      </Badge>
-                    )}
+          {/* Quick Stats - Phase 1 */}
+          {applicationStats && profileViewStats && (
+            <DashboardStats
+              applicationsCount={applicationStats.total}
+              applicationsThisWeek={applicationStats.thisWeek}
+              profileViews={profileViewStats.total}
+              profileViewsThisWeek={profileViewStats.thisWeek}
+              activeConversations={conversationsCount || 0}
+              unreadMessages={unreadMessagesCount || 0}
+              savedJobsCount={savedJobsCount || 0}
+              newMatches={matchedJobs?.length || 0}
+            />
+          )}
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            {/* Left Column - Applications Timeline */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Application Status Timeline */}
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-1">Application Status</h2>
+                    <p className="text-sm text-muted-foreground">Track all your job applications</p>
                   </div>
-                  <p className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1">{stat.value}</p>
-                  <span className="text-xs md:text-sm text-muted-foreground font-medium">{stat.label}</span>
-                </Card>
-              );
-              return stat.link ? (
-                <Link key={stat.label} href={stat.link} className="block">
-                  {content}
-                </Link>
-              ) : (
-                content
-              );
-            })}
+                  <Link href="/teacher/applications">
+                    <Button variant="outline" size="sm">
+                      View All
+                    </Button>
+                  </Link>
+                </div>
+
+                {applicationsLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
+                    ))}
+                  </div>
+                ) : applications && applications.length > 0 ? (
+                  <div className="space-y-4">
+                    {applications.slice(0, 5).map((application) => (
+                      <div
+                        key={application.id}
+                        className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => setSelectedApplication(application)}
+                      >
+                        <ApplicationTimeline application={application} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon="file"
+                    title="No applications yet"
+                    description="You haven't applied to any jobs yet. Browse jobs to get started!"
+                    action={{
+                      label: "Browse Jobs",
+                      href: "/jobs"
+                    }}
+                  />
+                )}
+              </Card>
+
+              {/* Recommended Jobs */}
+              <RecommendedJobs
+                jobs={recommendedJobs || []}
+                teacherArchetype={teacherProfile?.archetype || undefined}
+                isLoading={jobsLoading}
+              />
+            </div>
+
+            {/* Right Column - Widgets */}
+            <div className="space-y-6">
+              {/* Profile Completion Widget */}
+              {teacherProfile && (
+                <ProfileCompletionWidget teacher={teacherProfile} />
+              )}
+
+              {/* Profile Analytics */}
+              {teacherProfile?.id && (
+                <ProfileAnalyticsChart teacherId={teacherProfile.id} />
+              )}
+            </div>
           </div>
 
           {/* Tabs for Applications and Matched Jobs */}
@@ -714,6 +840,15 @@ export default function TeacherDashboard() {
           )}
         </div>
       </div>
+
+      {/* Application Detail Modal */}
+      {selectedApplication && (
+        <ApplicationDetailModal
+          application={selectedApplication}
+          open={!!selectedApplication}
+          onOpenChange={(open) => !open && setSelectedApplication(null)}
+        />
+      )}
     </AuthenticatedLayout>
   );
 

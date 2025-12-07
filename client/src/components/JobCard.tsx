@@ -14,23 +14,58 @@ import type { Job } from '@shared/schema';
 import { formatDistanceToNow } from 'date-fns';
 
 interface JobCardProps {
-  job: Job;
+  job?: Job; // Make job optional for loading state
   showQuickApply?: boolean;
   matchScore?: number;
+  isLoading?: boolean;
 }
 
-export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProps) {
+import { Skeleton } from "@/components/ui/skeleton";
+
+export function JobCard({ job, showQuickApply = false, matchScore, isLoading }: JobCardProps) {
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const { data: user } = useQuery({
     queryKey: ['/api/auth/user'],
     queryFn: async () => {
       const { data } = await supabase.auth.getUser();
       return data.user;
     },
+    enabled: !isLoading,
   });
+
+  if (isLoading || !job) {
+    return (
+      <Card className="p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Skeleton className="h-16 w-16 sm:h-12 sm:w-12 rounded-lg" />
+          <div className="flex-1 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-8 w-16" />
+            </div>
+            <Skeleton className="h-4 w-1/2" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+            <div className="flex justify-between items-center pt-2">
+              <div className="flex gap-4">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <div className="flex gap-2">
+                <Skeleton className="h-10 w-24" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   const { data: hasApplied } = useQuery({
     queryKey: ['/api/has-applied', user?.id, job.id],
@@ -42,7 +77,7 @@ export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProp
         .eq('teacher_id', user.id)
         .eq('job_id', job.id)
         .maybeSingle();
-      
+
       if (error && error.code !== 'PGRST116') {
         console.error('Error checking application status:', error);
       }
@@ -73,6 +108,7 @@ export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProp
   const favoriteMutation = useMutation({
     mutationFn: async (isFavorited: boolean) => {
       if (!user?.id || !matchData?.id) {
+        if (!user?.id) throw new Error("User not authenticated");
         // Create match record if it doesn't exist
         const { data: newMatch } = await supabase
           .from('teacher_job_matches')
@@ -112,6 +148,7 @@ export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProp
                 src={job.school_logo}
                 alt={job.school_name}
                 className="h-16 w-16 sm:h-12 sm:w-12 rounded-lg object-cover"
+                loading="lazy"
               />
             ) : (
               <div className="h-16 w-16 sm:h-12 sm:w-12 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -191,7 +228,7 @@ export function JobCard({ job, showQuickApply = false, matchScore }: JobCardProp
                   <span>{formatDistanceToNow(new Date(job.posted_at), { addSuffix: true })}</span>
                 </div>
               </div>
-              
+
               {/* Action Buttons - Full width on mobile */}
               {showQuickApply && isTeacher && (
                 <div className="flex flex-col sm:flex-row gap-2 sm:w-auto w-full">

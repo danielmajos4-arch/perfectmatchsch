@@ -35,9 +35,17 @@ export interface Application {
   job_id: string;
   teacher_id: string;
   cover_letter: string;
-  status: string;
+  status: 'pending' | 'under_review' | 'interview_scheduled' | 'offer_made' | 'rejected' | 'withdrawn';
   applied_at: string;
   desired_salary?: string; // Added for teacher's desired salary
+  viewed_at?: string | null;
+  viewed_count?: number;
+  school_notes?: string | null;
+  interview_scheduled_at?: string | null;
+  offer_made_at?: string | null;
+  rejected_at?: string | null;
+  rejection_reason?: string | null;
+  withdrawn_at?: string | null;
 }
 
 export interface Conversation {
@@ -123,6 +131,8 @@ export interface Teacher {
   resume_url: string | null;
   profile_photo_url: string | null;
   portfolio_url: string | null;
+  video_intro_url?: string | null;
+  video_intro_thumbnail_url?: string | null;
   created_at: string;
 }
 
@@ -225,6 +235,22 @@ export interface SavedSearch {
   last_checked_at: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface SavedJob {
+  id: string;
+  teacher_id: string;
+  job_id: string;
+  saved_at: string;
+  notes?: string | null;
+}
+
+export interface ProfileView {
+  id: string;
+  teacher_id: string;
+  school_id?: string | null;
+  viewed_at: string;
+  source?: string | null;
 }
 
 export interface SearchHistory {
@@ -343,3 +369,70 @@ export interface Offer {
 }
 
 export type InsertOffer = Omit<Offer, 'id' | 'created_at' | 'updated_at'>;
+
+// Phase 3: Interview Scheduling
+export interface InterviewInvite {
+  id: string;
+  application_id: string;
+  teacher_id: string;
+  school_id: string;
+  job_id: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  interview_type: 'video' | 'phone' | 'in_person';
+  location?: string | null;
+  meeting_link?: string | null;
+  notes?: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'completed' | 'cancelled';
+  teacher_response_at?: string | null;
+  teacher_notes?: string | null;
+  google_calendar_event_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Phase 3: Reviews & Ratings
+export interface Review {
+  id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  review_type: 'teacher_review' | 'school_review';
+  job_id?: string | null;
+  interview_id?: string | null;
+  rating: number; // 1-5
+  title?: string | null;
+  comment?: string | null;
+  categories?: Record<string, number>; // e.g., {"communication": 5, "professionalism": 4}
+  is_anonymous: boolean;
+  is_verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Phase 3: Salary Insights
+export interface SalaryData {
+  id: string;
+  subject: string;
+  grade_level: string;
+  location: string;
+  years_experience: string;
+  salary_min: number;
+  salary_max: number;
+  salary_median: number;
+  sample_size: number;
+  last_updated: string;
+}
+
+// Phase 3: Application Templates
+export interface ApplicationTemplate {
+  id: string;
+  name: string;
+  archetype?: string | null;
+  subject?: string | null;
+  cover_letter_template: string;
+  description?: string | null;
+  is_default: boolean;
+  usage_count: number;
+  created_at: string;
+  updated_at: string;
+}

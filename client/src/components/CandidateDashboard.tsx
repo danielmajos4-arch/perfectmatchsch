@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, Search, Filter, Eye, FileText, Mail, ExternalLink, Star, X, LayoutGrid, List, CheckSquare, Square, Download, MoreHorizontal, Trash2, MessageCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getSchoolCandidates, updateCandidateStatus } from '@/lib/matchingService';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -76,7 +77,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Conversation creation timed out. Please try again.')), 10000);
       });
-      
+
       const { conversation } = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
 
       // Navigate to messages with conversation ID
@@ -130,7 +131,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
 
   const bulkUpdateMutation = useMutation({
     mutationFn: async ({ candidateIds, status, notes }: { candidateIds: string[]; status: string; notes?: string }) => {
-      const promises = candidateIds.map(id => 
+      const promises = candidateIds.map(id =>
         updateCandidateStatus(id, status as any, notes)
       );
       return await Promise.all(promises);
@@ -163,7 +164,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
       candidate.teacher_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       candidate.job_title.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesGrade = filters.gradeLevel === 'all' || 
+    const matchesGrade = filters.gradeLevel === 'all' ||
       candidate.teacher_grade_levels.includes(filters.gradeLevel);
 
     return matchesSearch && matchesGrade;
@@ -220,7 +221,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
     }
     setSelectedCandidates(newSelected);
     setShowBulkActions(newSelected.size > 0);
-    
+
     // Update comparison candidates
     if (checked && newSelected.size <= 3) {
       const candidate = filteredCandidates?.find(c => c.id === candidateId);
@@ -254,9 +255,9 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
 
   const handleBulkExport = () => {
     if (selectedCandidates.size === 0) return;
-    
+
     const selected = filteredCandidates?.filter(c => selectedCandidates.has(c.id)) || [];
-    
+
     // Create CSV content
     const headers = ['Name', 'Email', 'Archetype', 'Match Score', 'Status', 'Job Title', 'School', 'Subjects', 'Grade Levels', 'Location', 'Created At'];
     const rows = selected.map(c => [
@@ -295,7 +296,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
     });
   };
 
-  const isAllSelected = filteredCandidates && filteredCandidates.length > 0 && 
+  const isAllSelected = filteredCandidates && filteredCandidates.length > 0 &&
     filteredCandidates.every(c => selectedCandidates.has(c.id));
   const isSomeSelected = selectedCandidates.size > 0 && !isAllSelected;
 
@@ -321,7 +322,7 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
     <div className="space-y-6">
       {/* Header - Mobile First */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
+        <div>
           <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">Candidate Pool</h2>
           <p className="text-sm sm:text-base text-muted-foreground">View and manage candidates matched to your jobs</p>
         </div>
@@ -389,48 +390,48 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
               className="h-12 pl-10 w-full"
             />
           </div>
-          
+
           {/* Filters - Grid on mobile, row on desktop */}
           <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-row gap-3 md:gap-4">
-          <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
+            <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
               <SelectTrigger className="h-12 w-full md:w-48">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="new">New</SelectItem>
-              <SelectItem value="reviewed">Reviewed</SelectItem>
-              <SelectItem value="contacted">Contacted</SelectItem>
-              <SelectItem value="shortlisted">Shortlisted</SelectItem>
-              <SelectItem value="hired">Hired</SelectItem>
-              <SelectItem value="hidden">Hidden</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filters.archetype} onValueChange={(value) => setFilters({ ...filters, archetype: value })}>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="reviewed">Reviewed</SelectItem>
+                <SelectItem value="contacted">Contacted</SelectItem>
+                <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                <SelectItem value="hired">Hired</SelectItem>
+                <SelectItem value="hidden">Hidden</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filters.archetype} onValueChange={(value) => setFilters({ ...filters, archetype: value })}>
               <SelectTrigger className="h-12 w-full md:w-48">
-              <SelectValue placeholder="Archetype" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Archetypes</SelectItem>
-              <SelectItem value="The Guide">The Guide</SelectItem>
-              <SelectItem value="The Trailblazer">The Trailblazer</SelectItem>
-              <SelectItem value="The Changemaker">The Changemaker</SelectItem>
-              <SelectItem value="The Connector">The Connector</SelectItem>
-              <SelectItem value="The Explorer">The Explorer</SelectItem>
-              <SelectItem value="The Leader">The Leader</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filters.gradeLevel} onValueChange={(value) => setFilters({ ...filters, gradeLevel: value })}>
+                <SelectValue placeholder="Archetype" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Archetypes</SelectItem>
+                <SelectItem value="The Guide">The Guide</SelectItem>
+                <SelectItem value="The Trailblazer">The Trailblazer</SelectItem>
+                <SelectItem value="The Changemaker">The Changemaker</SelectItem>
+                <SelectItem value="The Connector">The Connector</SelectItem>
+                <SelectItem value="The Explorer">The Explorer</SelectItem>
+                <SelectItem value="The Leader">The Leader</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filters.gradeLevel} onValueChange={(value) => setFilters({ ...filters, gradeLevel: value })}>
               <SelectTrigger className="h-12 w-full md:w-48">
-              <SelectValue placeholder="Grade Level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Grades</SelectItem>
-              <SelectItem value="Elementary">Elementary</SelectItem>
-              <SelectItem value="Middle School">Middle School</SelectItem>
-              <SelectItem value="High School">High School</SelectItem>
-            </SelectContent>
-          </Select>
+                <SelectValue placeholder="Grade Level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="Elementary">Elementary</SelectItem>
+                <SelectItem value="Middle School">Middle School</SelectItem>
+                <SelectItem value="High School">High School</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </Card>
@@ -512,359 +513,380 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
       ) : (
         <>
           {/* Candidates List - Mobile First: Cards on mobile, Table on desktop */}
-      {isLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 bg-card border border-card-border rounded-lg animate-pulse" />
-          ))}
-        </div>
-      ) : filteredCandidates && filteredCandidates.length > 0 ? (
-        <>
-          {/* Mobile: Card Layout */}
-          <div className="md:hidden space-y-4">
-            {filteredCandidates.map((candidate) => (
-              <Card key={candidate.id} className="p-4">
-                <div className="space-y-4">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <Checkbox
-                        checked={selectedCandidates.has(candidate.id)}
-                        onCheckedChange={(checked) => handleSelectCandidate(candidate.id, checked as boolean)}
-                        className="flex-shrink-0"
-                      />
-                      <Avatar className="h-12 w-12 flex-shrink-0">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold text-base">
-                          {getInitials(candidate.teacher_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-foreground truncate">{candidate.teacher_name}</p>
-                        <p className="text-sm text-muted-foreground truncate">{candidate.teacher_email}</p>
+          import {Skeleton} from "@/components/ui/skeleton";
+
+          // ... existing code ...
+
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3 w-full">
+                      <Skeleton className="h-12 w-12 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-3 w-1/4" />
                       </div>
                     </div>
-                    {getStatusBadge(candidate.status)}
                   </div>
-
-                  {/* Job Info */}
-                  <div className="border-t pt-3">
-                    <p className="font-medium text-foreground text-sm mb-1">{candidate.job_title}</p>
-                    <p className="text-xs text-muted-foreground">{candidate.school_name}</p>
-                  </div>
-
-                  {/* Match Info & Archetype */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Badge variant="secondary" className="rounded-full">
-                      {candidate.teacher_archetype || 'N/A'}
-                    </Badge>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-semibold text-foreground">{candidate.match_score}</span>
-                      <span className="text-xs text-muted-foreground">pts</span>
+                  <div className="mt-4 space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
                     </div>
                   </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 pt-2 border-t">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 h-11"
-                      onClick={() => {
-                        setSelectedCandidate(candidate);
-                        setShowProfileModal(true);
-                      }}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Profile
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-11 gap-2"
-                      onClick={() => handleMessageTeacher(candidate)}
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Message
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-11 gap-2"
-                      onClick={async () => {
-                        try {
-                          // Fetch application by job_id and teacher_id
-                          let application = null;
-                          
-                          if (candidate.application_id) {
-                            const { data: appData } = await supabase
-                              .from('applications')
-                              .select('*, job:jobs(*), teacher:teachers!applications_teacher_id_fkey(*)')
-                              .eq('id', candidate.application_id)
-                              .maybeSingle();
-                            application = appData;
-                          }
-                          
-                          if (!application && candidate.job_id && candidate.teacher_id) {
-                            const { data: appData } = await supabase
-                              .from('applications')
-                              .select('*, job:jobs(*), teacher:teachers!applications_teacher_id_fkey(*)')
-                              .eq('job_id', candidate.job_id)
-                              .eq('teacher_id', candidate.teacher_id)
-                              .maybeSingle();
-                            application = appData;
-                          }
-                          
-                          if (application) {
-                            const job = Array.isArray(application.job) ? application.job[0] : application.job;
-                            const teacher = Array.isArray(application.teacher) ? application.teacher[0] : application.teacher;
-                            setSelectedApplication({
-                              ...application,
-                              job: job as Job,
-                              teacher: teacher as Teacher,
-                            } as any);
-                            setShowEmailModal(true);
-                          } else {
-                            toast({
-                              title: 'Application not found',
-                              description: 'Could not find application data.',
-                              variant: 'destructive',
-                            });
-                          }
-                        } catch (error: any) {
-                          console.error('Error fetching application:', error);
-                          toast({
-                            title: 'Error',
-                            description: 'Failed to load application data.',
-                            variant: 'destructive',
-                          });
-                        }
-                      }}
-                    >
-                      <Mail className="h-4 w-4" />
-                      Email
-                    </Button>
-                    <Select
-                      value={candidate.status}
-                      onValueChange={(value) => handleStatusChange(candidate.id, value)}
-                    >
-                      <SelectTrigger className="h-11 flex-1 min-w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">New</SelectItem>
-                        <SelectItem value="reviewed">Reviewed</SelectItem>
-                        <SelectItem value="contacted">Contacted</SelectItem>
-                        <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                        <SelectItem value="hired">Hired</SelectItem>
-                        <SelectItem value="hidden">Hidden</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          {/* Desktop: Table Layout */}
-          <Card className="hidden md:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={isAllSelected}
-                      ref={(el) => {
-                        if (el) {
-                          el.indeterminate = isSomeSelected;
-                        }
-                      }}
-                      onCheckedChange={handleSelectAll}
-                    />
-                  </TableHead>
-                <TableHead>Candidate</TableHead>
-                <TableHead>Archetype</TableHead>
-                <TableHead>Match Score</TableHead>
-                <TableHead>Job</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCandidates.map((candidate) => (
-                <TableRow key={candidate.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedCandidates.has(candidate.id)}
-                        onCheckedChange={(checked) => handleSelectCandidate(candidate.id, checked as boolean)}
-                      />
-                    </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                          {getInitials(candidate.teacher_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold text-foreground">{candidate.teacher_name}</p>
-                        <p className="text-sm text-muted-foreground">{candidate.teacher_email}</p>
+                </Card>
+              ))}
+            </div>
+          ) : filteredCandidates && filteredCandidates.length > 0 ? (
+            <>
+              {/* Mobile: Card Layout */}
+              <div className="md:hidden space-y-4">
+                {filteredCandidates.map((candidate) => (
+                  <Card key={candidate.id} className="p-4">
+                    <div className="space-y-4">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Checkbox
+                            checked={selectedCandidates.has(candidate.id)}
+                            onCheckedChange={(checked) => handleSelectCandidate(candidate.id, checked as boolean)}
+                            className="flex-shrink-0"
+                          />
+                          <Avatar className="h-12 w-12 flex-shrink-0">
+                            <AvatarFallback className="bg-primary/10 text-primary font-semibold text-base">
+                              {getInitials(candidate.teacher_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-foreground truncate">{candidate.teacher_name}</p>
+                            <p className="text-sm text-muted-foreground truncate">{candidate.teacher_email}</p>
+                          </div>
+                        </div>
+                        {getStatusBadge(candidate.status)}
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="rounded-full">
-                      {candidate.teacher_archetype || 'N/A'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{candidate.match_score}</span>
-                      <span className="text-xs text-muted-foreground">pts</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium text-foreground">{candidate.job_title}</p>
-                      <p className="text-sm text-muted-foreground">{candidate.school_name}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(candidate.status)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedCandidate(candidate);
-                          setShowProfileModal(true);
-                        }}
-                        title="View Profile"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleMessageTeacher(candidate)}
-                        title="Message Teacher"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={async () => {
-                          try {
-                            // Fetch application by job_id and teacher_id (more reliable than by ID)
-                            let application = null;
-                            
-                            if (candidate.application_id) {
-                              // Try to fetch by application_id first
-                              const { data: appData, error: appError } = await supabase
-                                .from('applications')
-                                .select(`
-                                  *,
-                                  job:jobs(*),
-                                  teacher:teachers!applications_teacher_id_fkey(*)
-                                `)
-                                .eq('id', candidate.application_id)
-                                .maybeSingle();
-                              
-                              if (!appError && appData) {
+
+                      {/* Job Info */}
+                      <div className="border-t pt-3">
+                        <p className="font-medium text-foreground text-sm mb-1">{candidate.job_title}</p>
+                        <p className="text-xs text-muted-foreground">{candidate.school_name}</p>
+                      </div>
+
+                      {/* Match Info & Archetype */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Badge variant="secondary" className="rounded-full">
+                          {candidate.teacher_archetype || 'N/A'}
+                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <span className="text-sm font-semibold text-foreground">{candidate.match_score}</span>
+                          <span className="text-xs text-muted-foreground">pts</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 h-11"
+                          onClick={() => {
+                            setSelectedCandidate(candidate);
+                            setShowProfileModal(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Profile
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-11 gap-2"
+                          onClick={() => handleMessageTeacher(candidate)}
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Message
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-11 gap-2"
+                          onClick={async () => {
+                            try {
+                              // Fetch application by job_id and teacher_id
+                              let application = null;
+
+                              if (candidate.application_id) {
+                                const { data: appData } = await supabase
+                                  .from('applications')
+                                  .select('*, job:jobs(*), teacher:teachers!applications_teacher_id_fkey(*)')
+                                  .eq('id', candidate.application_id)
+                                  .maybeSingle();
                                 application = appData;
                               }
-                            }
-                            
-                            // If not found by application_id, try by job_id and teacher_id
-                            if (!application && candidate.job_id && candidate.teacher_id) {
-                              const { data: appData, error: appError } = await supabase
-                                .from('applications')
-                                .select(`
-                                  *,
-                                  job:jobs(*),
-                                  teacher:teachers!applications_teacher_id_fkey(*)
-                                `)
-                                .eq('job_id', candidate.job_id)
-                                .eq('teacher_id', candidate.teacher_id)
-                                .maybeSingle();
-                              
-                              if (!appError && appData) {
+
+                              if (!application && candidate.job_id && candidate.teacher_id) {
+                                const { data: appData } = await supabase
+                                  .from('applications')
+                                  .select('*, job:jobs(*), teacher:teachers!applications_teacher_id_fkey(*)')
+                                  .eq('job_id', candidate.job_id)
+                                  .eq('teacher_id', candidate.teacher_id)
+                                  .maybeSingle();
                                 application = appData;
                               }
-                            }
-                            
-                            if (application) {
-                              // Ensure job and teacher data are properly structured
-                              const job = Array.isArray(application.job) 
-                                ? application.job[0] 
-                                : application.job;
-                              const teacher = Array.isArray(application.teacher)
-                                ? application.teacher[0]
-                                : application.teacher;
-                              
-                              setSelectedApplication({
-                                ...application,
-                                job: job as Job,
-                                teacher: teacher as Teacher,
-                              } as any);
-                              setShowEmailModal(true);
-                            } else {
+
+                              if (application) {
+                                const job = Array.isArray(application.job) ? application.job[0] : application.job;
+                                const teacher = Array.isArray(application.teacher) ? application.teacher[0] : application.teacher;
+                                setSelectedApplication({
+                                  ...application,
+                                  job: job as Job,
+                                  teacher: teacher as Teacher,
+                                } as any);
+                                setShowEmailModal(true);
+                              } else {
+                                toast({
+                                  title: 'Application not found',
+                                  description: 'Could not find application data.',
+                                  variant: 'destructive',
+                                });
+                              }
+                            } catch (error: any) {
+                              console.error('Error fetching application:', error);
                               toast({
-                                title: 'Application not found',
-                                description: 'Could not find application data for this candidate.',
+                                title: 'Error',
+                                description: 'Failed to load application data.',
                                 variant: 'destructive',
                               });
                             }
-                          } catch (error: any) {
-                            console.error('Error fetching application:', error);
-                            toast({
-                              title: 'Error',
-                              description: error.message || 'Failed to load application data.',
-                              variant: 'destructive',
-                            });
-                          }
-                        }}
-                        title="Email Applicant"
-                      >
-                        <Mail className="h-4 w-4" />
-                      </Button>
-                      <Select
-                        value={candidate.status}
-                        onValueChange={(value) => handleStatusChange(candidate.id, value)}
-                      >
-                        <SelectTrigger className="h-8 w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="new">New</SelectItem>
-                          <SelectItem value="reviewed">Reviewed</SelectItem>
-                          <SelectItem value="contacted">Contacted</SelectItem>
-                          <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                          <SelectItem value="hired">Hired</SelectItem>
-                          <SelectItem value="hidden">Hidden</SelectItem>
-                        </SelectContent>
-                      </Select>
+                          }}
+                        >
+                          <Mail className="h-4 w-4" />
+                          Email
+                        </Button>
+                        <Select
+                          value={candidate.status}
+                          onValueChange={(value) => handleStatusChange(candidate.id, value)}
+                        >
+                          <SelectTrigger className="h-11 flex-1 min-w-[140px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="new">New</SelectItem>
+                            <SelectItem value="reviewed">Reviewed</SelectItem>
+                            <SelectItem value="contacted">Contacted</SelectItem>
+                            <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                            <SelectItem value="hired">Hired</SelectItem>
+                            <SelectItem value="hidden">Hidden</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
-        </>
-      ) : (
-        <Card className="p-8 text-center">
-          <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-lg text-muted-foreground mb-2">No candidates found</p>
-          <p className="text-sm text-muted-foreground">
-            {searchQuery || filters.status !== 'all' || filters.archetype !== 'all'
-              ? 'Try adjusting your search or filters'
-              : 'Candidates will appear here when they match your job postings'}
-          </p>
-        </Card>
-      )}
+                  </Card>
+                ))}
+              </div>
+
+              {/* Desktop: Table Layout */}
+              <Card className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Checkbox
+                          checked={isAllSelected}
+                          ref={(el) => {
+                            if (el) {
+                              (el as unknown as HTMLInputElement).indeterminate = isSomeSelected;
+                            }
+                          }}
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead>Candidate</TableHead>
+                      <TableHead>Archetype</TableHead>
+                      <TableHead>Match Score</TableHead>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCandidates.map((candidate) => (
+                      <TableRow key={candidate.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedCandidates.has(candidate.id)}
+                            onCheckedChange={(checked) => handleSelectCandidate(candidate.id, checked as boolean)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                                {getInitials(candidate.teacher_name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-semibold text-foreground">{candidate.teacher_name}</p>
+                              <p className="text-sm text-muted-foreground">{candidate.teacher_email}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="rounded-full">
+                            {candidate.teacher_archetype || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold">{candidate.match_score}</span>
+                            <span className="text-xs text-muted-foreground">pts</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-foreground">{candidate.job_title}</p>
+                            <p className="text-sm text-muted-foreground">{candidate.school_name}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(candidate.status)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setSelectedCandidate(candidate);
+                                setShowProfileModal(true);
+                              }}
+                              title="View Profile"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleMessageTeacher(candidate)}
+                              title="Message Teacher"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={async () => {
+                                try {
+                                  // Fetch application by job_id and teacher_id (more reliable than by ID)
+                                  let application = null;
+
+                                  if (candidate.application_id) {
+                                    // Try to fetch by application_id first
+                                    const { data: appData, error: appError } = await supabase
+                                      .from('applications')
+                                      .select(`
+                                  *,
+                                  job:jobs(*),
+                                  teacher:teachers!applications_teacher_id_fkey(*)
+                                `)
+                                      .eq('id', candidate.application_id)
+                                      .maybeSingle();
+
+                                    if (!appError && appData) {
+                                      application = appData;
+                                    }
+                                  }
+
+                                  // If not found by application_id, try by job_id and teacher_id
+                                  if (!application && candidate.job_id && candidate.teacher_id) {
+                                    const { data: appData, error: appError } = await supabase
+                                      .from('applications')
+                                      .select(`
+                                  *,
+                                  job:jobs(*),
+                                  teacher:teachers!applications_teacher_id_fkey(*)
+                                `)
+                                      .eq('job_id', candidate.job_id)
+                                      .eq('teacher_id', candidate.teacher_id)
+                                      .maybeSingle();
+
+                                    if (!appError && appData) {
+                                      application = appData;
+                                    }
+                                  }
+
+                                  if (application) {
+                                    // Ensure job and teacher data are properly structured
+                                    const job = Array.isArray(application.job)
+                                      ? application.job[0]
+                                      : application.job;
+                                    const teacher = Array.isArray(application.teacher)
+                                      ? application.teacher[0]
+                                      : application.teacher;
+
+                                    setSelectedApplication({
+                                      ...application,
+                                      job: job as Job,
+                                      teacher: teacher as Teacher,
+                                    } as any);
+                                    setShowEmailModal(true);
+                                  } else {
+                                    toast({
+                                      title: 'Application not found',
+                                      description: 'Could not find application data for this candidate.',
+                                      variant: 'destructive',
+                                    });
+                                  }
+                                } catch (error: any) {
+                                  console.error('Error fetching application:', error);
+                                  toast({
+                                    title: 'Error',
+                                    description: error.message || 'Failed to load application data.',
+                                    variant: 'destructive',
+                                  });
+                                }
+                              }}
+                              title="Email Applicant"
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                            <Select
+                              value={candidate.status}
+                              onValueChange={(value) => handleStatusChange(candidate.id, value)}
+                            >
+                              <SelectTrigger className="h-8 w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="new">New</SelectItem>
+                                <SelectItem value="reviewed">Reviewed</SelectItem>
+                                <SelectItem value="contacted">Contacted</SelectItem>
+                                <SelectItem value="shortlisted">Shortlisted</SelectItem>
+                                <SelectItem value="hired">Hired</SelectItem>
+                                <SelectItem value="hidden">Hidden</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            </>
+          ) : (
+            <Card className="p-8 text-center">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-lg text-muted-foreground mb-2">No candidates found</p>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery || filters.status !== 'all' || filters.archetype !== 'all'
+                  ? 'Try adjusting your search or filters'
+                  : 'Candidates will appear here when they match your job postings'}
+              </p>
+            </Card>
+          )}
         </>
       )}
 
@@ -974,8 +996,8 @@ export function CandidateDashboard({ schoolId, jobId }: CandidateDashboardProps)
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowNotesModal(false)}
               className="w-full sm:w-auto h-11 order-2 sm:order-1"
             >

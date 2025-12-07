@@ -102,6 +102,7 @@ const ARCHETYPES = [
 ];
 
 import { ManualCandidateModal } from '@/components/ManualCandidateModal';
+import { OnboardingTour } from '@/components/OnboardingTour';
 
 export default function SchoolDashboard() {
   const [, setLocation] = useLocation();
@@ -993,8 +994,50 @@ export default function SchoolDashboard() {
     toggleJobStatusMutation.mutate({ jobId: job.id, isActive: !job.is_active });
   };
 
+  // Tour steps configuration
+  const tourSteps = [
+    {
+      element: '[data-tour="dashboard-header"]',
+      popover: {
+        title: 'Welcome to your Dashboard',
+        description: 'This is your command center for managing jobs and candidates.',
+        side: 'bottom' as const,
+        align: 'start' as const,
+      }
+    },
+    {
+      element: '[data-tour="post-job-btn"]',
+      popover: {
+        title: 'Post a New Job',
+        description: 'Create a new job listing to start finding great teachers.',
+        side: 'bottom' as const,
+        align: 'end' as const,
+      }
+    },
+    {
+      element: '[data-tour="stats-cards"]',
+      popover: {
+        title: 'Quick Stats',
+        description: 'See your active jobs and total applications at a glance.',
+        side: 'top' as const,
+        align: 'center' as const,
+      }
+    },
+    {
+      element: '[data-tour="candidates-tab"]',
+      popover: {
+        title: 'Manage Candidates',
+        description: 'View and manage all your candidate applications here.',
+        side: 'top' as const,
+        align: 'center' as const,
+      }
+    }
+  ];
+
   return (
     <AuthenticatedLayout showMobileNav>
+      <OnboardingTour tourKey="school-dashboard" steps={tourSteps} />
+
       {/* Achievement Notification - Only for teachers */}
       {user?.user_metadata?.role === 'teacher' && (
         <AchievementNotification
@@ -1004,7 +1047,7 @@ export default function SchoolDashboard() {
         />
       )}
 
-      <div className="px-4 md:px-8 py-8 md:py-12 max-w-6xl mx-auto">
+      <div className="px-4 md:px-8 py-8 md:py-12 max-w-6xl mx-auto" data-tour="dashboard-header">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
           <div className="flex-1">
@@ -1043,7 +1086,7 @@ export default function SchoolDashboard() {
             ))}
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" data-tour="stats-cards">
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-2">
                 <Briefcase className="h-5 w-5 text-primary" />
@@ -1186,7 +1229,7 @@ export default function SchoolDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="jobs">Job Postings</TabsTrigger>
-            <TabsTrigger value="candidates">Candidates</TabsTrigger>
+            <TabsTrigger value="candidates" data-tour="candidates-tab">Candidates</TabsTrigger>
             <TabsTrigger value="offers">Offers</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
@@ -1244,10 +1287,8 @@ export default function SchoolDashboard() {
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-2">
-                          <Link href={`/jobs/${job.id}`}>
-                            <a className="text-xl font-semibold text-primary hover:underline block">
-                              {job.title}
-                            </a>
+                          <Link href={`/jobs/${job.id}`} className="text-xl font-semibold text-primary hover:underline block">
+                            {job.title}
                           </Link>
                           <Badge variant={job.is_active ? 'default' : 'secondary'} className="rounded-full flex-shrink-0">
                             {job.is_active ? 'Active' : 'Closed'}

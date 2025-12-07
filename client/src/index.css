@@ -13,36 +13,38 @@
 
 /* LIGHT MODE */
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --button-outline: rgba(0, 0, 0, .10);
+  --badge-outline: rgba(0, 0, 0, .05);
   --opaque-button-border-intensity: -8;
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
-  
+  --elevate-1: rgba(0, 0, 0, .03);
+  --elevate-2: rgba(0, 0, 0, .08);
+
   /* Premium Light Theme Base */
-  --background: 0 0% 98%; /* Slightly off-white for less harshness */
-  --foreground: 222 47% 11%; /* Deep navy/black for better readability */
-  
+  --background: 0 0% 98%;
+  /* Slightly off-white for less harshness */
+  --foreground: 222 47% 11%;
+  /* Deep navy/black for better readability */
+
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
   --card-border: 214 32% 91%;
-  
+
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
   --popover-border: 214 32% 91%;
-  
+
   --primary: 331 82% 45%;
   --primary-foreground: 0 0% 98%;
-  
+
   --secondary: 187 100% 42%;
   --secondary-foreground: 0 0% 98%;
-  
+
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
-  
+
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
-  
+
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
 
@@ -50,7 +52,8 @@
   --input: 214.3 31.8% 91.4%;
   --ring: 331 82% 45%;
 
-  --radius: 0.75rem; /* Slightly more rounded for modern feel */
+  --radius: 0.75rem;
+  /* Slightly more rounded for modern feel */
 
   /* Sidebar */
   --sidebar: 0 0% 98%;
@@ -71,7 +74,7 @@
   --brand-coral: 331 82% 45%;
   --brand-mint: 187 100% 42%;
   --brand-navy: 213 52% 24%;
-  
+
   /* Archetype Colors */
   --archetype-guide: 160 84% 39%;
   --archetype-trailblazer: 25 95% 53%;
@@ -79,7 +82,7 @@
   --archetype-connector: 330 81% 60%;
   --archetype-explorer: 189 95% 43%;
   --archetype-leader: 48 96% 53%;
-  
+
   /* Charts */
   --chart-1: 217 91% 45%;
   --chart-2: 142 76% 36%;
@@ -90,7 +93,7 @@
   --font-sans: 'Inter', sans-serif;
   --font-serif: 'Georgia', serif;
   --font-mono: 'Menlo', monospace;
-  
+
   /* Shadows */
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
@@ -121,38 +124,38 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(255, 255, 255, .10);
+  --badge-outline: rgba(255, 255, 255, .05);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
-  
+  --elevate-1: rgba(255, 255, 255, .04);
+  --elevate-2: rgba(255, 255, 255, .09);
+
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
-  
+
   --card: 222.2 84% 4.9%;
   --card-foreground: 210 40% 98%;
   --card-border: 217.2 32.6% 17.5%;
-  
+
   --popover: 222.2 84% 4.9%;
   --popover-foreground: 210 40% 98%;
   --popover-border: 217.2 32.6% 17.5%;
-  
+
   --primary: 331 82% 45%;
   --primary-foreground: 222.2 47.4% 11.2%;
-  
+
   --secondary: 217.2 32.6% 17.5%;
   --secondary-foreground: 210 40% 98%;
-  
+
   --muted: 217.2 32.6% 17.5%;
   --muted-foreground: 215 20.2% 65.1%;
-  
+
   --accent: 217.2 32.6% 17.5%;
   --accent-foreground: 210 40% 98%;
-  
+
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
-  
+
   --border: 217.2 32.6% 17.5%;
   --input: 217.2 32.6% 17.5%;
   --ring: 331 82% 45%;
@@ -171,13 +174,13 @@
   --brand-orange: 14 100% 60%;
   --brand-yellow: 45 100% 51%;
   --brand-green: 122 39% 49%;
-  
+
   --chart-1: 220 70% 50%;
   --chart-2: 160 60% 45%;
   --chart-3: 30 80% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
-  
+
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 1px 2px -1px hsl(0 0% 0% / 0.00);
@@ -238,29 +241,42 @@
     font-size: 16px;
     line-height: 1.5;
   }
-  
+
   /* CRITICAL: Text Containment Fix */
-  p, h1, h2, h3, h4, h5, h6, span, div, li, a {
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  span,
+  div,
+  li,
+  a {
     overflow-wrap: anywhere;
     word-break: break-word;
   }
 
   /* Prevent iOS zoom on input focus - must be 16px+ */
-  input, select, textarea {
+  input,
+  select,
+  textarea {
     font-size: 16px !important;
   }
 
   @media (min-width: 768px) {
-    input, select, textarea {
+
+    input,
+    select,
+    textarea {
       font-size: inherit !important;
     }
   }
 
   /* Skip link for screen readers */
   .skip-link {
-    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 
-           focus:bg-background focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg 
-           focus:ring-2 focus:ring-ring focus:outline-none;
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-background focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg focus:ring-2 focus:ring-ring focus:outline-none;
   }
 
   /* Enhanced focus styles for accessibility */
@@ -278,12 +294,19 @@
   }
 
   /* Smooth transitions for interactive elements */
-  button, a, [role="button"] {
+  button,
+  a,
+  [role="button"] {
     @apply transition-all duration-200 ease-in-out;
   }
 
   /* Better text rendering */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
 
@@ -294,6 +317,7 @@
 
   /* Reduced motion preference */
   @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
@@ -331,11 +355,12 @@
 }
 
 @layer utilities {
+
   /* Glassmorphism */
   .glass {
     @apply bg-white/70 dark:bg-black/70 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-sm;
   }
-  
+
   .glass-card {
     @apply bg-card/80 backdrop-blur-sm border border-border/50 shadow-sm;
   }
@@ -368,6 +393,7 @@
       opacity: 0;
       transform: translateY(10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -384,6 +410,7 @@
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -396,9 +423,12 @@
 
   /* Pulse animation for loading states */
   @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.5;
     }
@@ -413,18 +443,17 @@
     0% {
       background-position: -1000px 0;
     }
+
     100% {
       background-position: 1000px 0;
     }
   }
 
   .shimmer {
-    background: linear-gradient(
-      to right,
-      hsl(var(--muted)) 0%,
-      hsl(var(--muted) / 0.5) 50%,
-      hsl(var(--muted)) 100%
-    );
+    background: linear-gradient(to right,
+        hsl(var(--muted)) 0%,
+        hsl(var(--muted) / 0.5) 50%,
+        hsl(var(--muted)) 100%);
     background-size: 1000px 100%;
     animation: shimmer 2s infinite;
   }
@@ -444,22 +473,23 @@
 
   /* Gradient text animation */
   @keyframes gradient-shift {
-    0%, 100% {
+
+    0%,
+    100% {
       background-position: 0% 50%;
     }
+
     50% {
       background-position: 100% 50%;
     }
   }
 
   .gradient-text-animated {
-    background: linear-gradient(
-      90deg,
-      hsl(var(--brand-cyan)),
-      hsl(var(--brand-magenta)),
-      hsl(var(--brand-orange)),
-      hsl(var(--brand-cyan))
-    );
+    background: linear-gradient(90deg,
+        hsl(var(--brand-cyan)),
+        hsl(var(--brand-magenta)),
+        hsl(var(--brand-orange)),
+        hsl(var(--brand-cyan)));
     background-size: 200% 200%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -515,7 +545,7 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
   }
@@ -527,7 +557,7 @@
   }
 
   /* Touch-friendly spacing */
-  .touch-spacing > * {
+  .touch-spacing>* {
     @apply py-3;
   }
 
@@ -535,6 +565,7 @@
   .line-clamp-1 {
     display: -webkit-box;
     -webkit-line-clamp: 1;
+    line-clamp: 1;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -542,6 +573,7 @@
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -549,6 +581,7 @@
   .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;
+    line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }

@@ -474,3 +474,99 @@ export async function getJobsByArchetype(
   })) as Job[];
 }
 
+/**
+ * Calculate match percentage between teacher and job
+ * Returns score from 0-100
+ */
+export function calculateJobMatch(teacher: any, job: Job): number {
+  let score = 0;
+  let totalWeight = 0;
+
+  // Subject match (weight: 35%)
+  const subjectWeight = 35;
+  const teacherSubjects = teacher.subjects || [];
+  const jobSubject = job.subject || '';
+  const subjectMatches = teacherSubjects.includes(jobSubject) ? 1 : 0;
+  const subjectScore = subjectMatches * 100;
+  score += subjectScore * (subjectWeight / 100);
+  totalWeight += subjectWeight;
+
+  // Grade level match (weight: 25%)
+  const gradeWeight = 25;
+  const teacherGrades = teacher.grade_levels || [];
+  const jobGrade = job.grade_level || '';
+  const gradeMatches = teacherGrades.includes(jobGrade) ? 1 : 0;
+  const gradeScore = gradeMatches > 0 ? 100 : 0;
+  score += gradeScore * (gradeWeight / 100);
+  totalWeight += gradeWeight;
+
+  // Archetype/culture match (weight: 20%)
+  const cultureWeight = 20;
+  const teacherArchetype = teacher.archetype || '';
+  const jobArchetypeTags = job.archetype_tags || [];
+  const cultureScore = jobArchetypeTags.length > 0 && teacherArchetype 
+    ? (jobArchetypeTags.includes(teacherArchetype) ? 100 : 50)
+    : 50;
+  score += cultureScore * (cultureWeight / 100);
+  totalWeight += cultureWeight;
+
+  // Location match (weight: 15%)
+  const locationWeight = 15;
+  const teacherLocation = teacher.location || '';
+  const jobLocation = job.location || '';
+  const locationScore = teacherLocation === jobLocation ? 100 : 70;
+  score += locationScore * (locationWeight / 100);
+  totalWeight += locationWeight;
+
+  // Experience match (weight: 5%)
+  const expWeight = 5;
+  const expScore = 80; // Default reasonable match
+  score += expScore * (expWeight / 100);
+  totalWeight += expWeight;
+
+  return Math.round(score);
+}
+
+/**
+ * Get recommended jobs for teacher with match scores
+ */
+export async function getRecommendedJobs(teacherId: string, limit = 10): Promise<Array<Job & { matchScore: number }>> {
+  // Get teacher profile
+  const { data: teacher, error: teacherError } = await supabase
+    .from('teachers')
+    .select('*')
+    .eq('id', teacherId)
+    .single();
+
+  if (teacherError || !teacher) {
+    console.error('[Matching] Teacher not found:', teacherError);
+    return [];
+  }
+
+  // Get all active jobs
+  const { data: jobs, error: jobsError } = await supabase
+    .from('jobs')
+    .select(`
+      *,
+      school:schools(school_name, logo_url, location)
+    `)
+    .eq('is_active', true)
+    .order('posted_at', { ascending: false });
+
+  if (jobsError || !jobs) {
+    console.error('[Matching] Failed to fetch jobs:', jobsError);
+    return [];
+  }
+
+  // Calculate match score for each job
+  const jobsWithScores = jobs.map(job => ({
+    ...job,
+    matchScore: calculateJobMatch(teacher, job as Job),
+  }));
+
+  // Sort by match score and return top N
+  return jobsWithScores
+    .sort((a, b) => b.matchScore - a.matchScore)
+    .slice(0, limit);
+}
+

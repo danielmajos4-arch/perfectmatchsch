@@ -43,24 +43,28 @@ ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Everyone can view active achievements
+DROP POLICY IF EXISTS "Anyone can view active achievements" ON public.achievements;
 CREATE POLICY "Anyone can view active achievements"
   ON public.achievements
   FOR SELECT
   USING (is_active = true);
 
 -- RLS Policy: Users can view their own achievements
+DROP POLICY IF EXISTS "Users can view their own achievements" ON public.user_achievements;
 CREATE POLICY "Users can view their own achievements"
   ON public.user_achievements
   FOR SELECT
   USING (auth.uid() = user_id);
 
 -- RLS Policy: Users can insert their own achievements (via service)
+DROP POLICY IF EXISTS "Users can insert their own achievements" ON public.user_achievements;
 CREATE POLICY "Users can insert their own achievements"
   ON public.user_achievements
   FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
 -- RLS Policy: Users can update their own achievements (for progress tracking)
+DROP POLICY IF EXISTS "Users can update their own achievements" ON public.user_achievements;
 CREATE POLICY "Users can update their own achievements"
   ON public.user_achievements
   FOR UPDATE

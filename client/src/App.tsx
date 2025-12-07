@@ -18,6 +18,11 @@ import RoleSelection from "@/pages/RoleSelection";
 import Dashboard from "@/pages/Dashboard";
 import TeacherDashboard from "@/pages/TeacherDashboard";
 import SchoolDashboard from "@/pages/SchoolDashboard";
+import MyApplications from "@/pages/teacher/MyApplications";
+import SavedJobs from "@/pages/teacher/SavedJobs";
+import PublicProfile from "@/pages/teacher/PublicProfile";
+import BrowseTeachers from "@/pages/school/BrowseTeachers";
+import NotificationSettings from "@/pages/teacher/NotificationSettings";
 import TeacherOnboarding from "@/pages/onboarding/TeacherOnboarding";
 import SchoolOnboarding from "@/pages/onboarding/SchoolOnboarding";
 import Jobs from "@/pages/Jobs";
@@ -109,6 +114,37 @@ function Router() {
 
         {/* Generic dashboard route - redirects to role-specific dashboard */}
         <Route path="/dashboard" component={Dashboard} />
+
+        {/* Teacher-specific routes */}
+        <Route path="/teacher/applications">
+          <RoleProtectedRoute allowedRole="teacher">
+            <OnboardingRequired>
+              <MyApplications />
+            </OnboardingRequired>
+          </RoleProtectedRoute>
+        </Route>
+        <Route path="/teacher/saved-jobs">
+          <RoleProtectedRoute allowedRole="teacher">
+            <OnboardingRequired>
+              <SavedJobs />
+            </OnboardingRequired>
+          </RoleProtectedRoute>
+        </Route>
+        <Route path="/teacher/settings/notifications">
+          <RoleProtectedRoute allowedRole="teacher">
+            <OnboardingRequired>
+              <NotificationSettings />
+            </OnboardingRequired>
+          </RoleProtectedRoute>
+        </Route>
+
+        {/* Public teacher profiles */}
+        <Route path="/teachers/:teacherId" component={PublicProfile} />
+        <Route path="/teachers">
+          <RoleProtectedRoute allowedRole="school">
+            <BrowseTeachers />
+          </RoleProtectedRoute>
+        </Route>
 
         {/* Other protected routes */}
         <Route path="/jobs">

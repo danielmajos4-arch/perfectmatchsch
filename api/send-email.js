@@ -1,16 +1,141 @@
 /**
  * Vercel Serverless Function for sending emails via Resend
  * POST /api/send-email
+ * 
+ * Security features:
+ * - JWT authentication via Supabase
+ * - Rate limiting per user
+ * - CORS restricted to allowed origins
  */
 
 import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
+
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute window
+const RATE_LIMIT_MAX_REQUESTS = 10; // Max 10 emails per minute per user
+
+// In-memory rate limit store (resets on cold start, but protects during warm instances)
+// For production, consider using Upstash Redis or Vercel KV for persistent rate limiting
+const rateLimitStore = new Map();
+
+/**
+ * Check if user has exceeded rate limit
+ * @param {string} userId - User ID or IP address
+ * @returns {{ allowed: boolean, remaining: number, resetAt: number }}
+ */
+function checkRateLimit(userId) {
+  const now = Date.now();
+  const key = `email:${userId}`;
+  
+  let record = rateLimitStore.get(key);
+  
+  // Clean up expired entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [k, v] of rateLimitStore.entries()) {
+      if (v.resetAt < now) {
+        rateLimitStore.delete(k);
+      }
+    }
+  }
+  
+  // Create new record if none exists or if window has expired
+  if (!record || record.resetAt < now) {
+    record = {
+      count: 0,
+      resetAt: now + RATE_LIMIT_WINDOW_MS
+    };
+  }
+  
+  // Increment request count
+  record.count++;
+  rateLimitStore.set(key, record);
+  
+  const remaining = Math.max(0, RATE_LIMIT_MAX_REQUESTS - record.count);
+  const allowed = record.count <= RATE_LIMIT_MAX_REQUESTS;
+  
+  return {
+    allowed,
+    remaining,
+    resetAt: record.resetAt
+  };
+}
+
+// Get allowed origins from environment or use defaults
+function getAllowedOrigin(requestOrigin) {
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : ['http://localhost:5173', 'http://localhost:3000'];
+  
+  // Add the Vercel deployment URL if available
+  if (process.env.VERCEL_URL) {
+    allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
+  }
+  
+  // Add production URL if configured
+  if (process.env.PRODUCTION_URL) {
+    allowedOrigins.push(process.env.PRODUCTION_URL);
+  }
+  
+  // Check if request origin is allowed
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+  
+  // Return first allowed origin as default (for same-origin requests)
+  return allowedOrigins[0];
+}
+
+// Set CORS headers
+function setCorsHeaders(req, res) {
+  const origin = getAllowedOrigin(req.headers.origin);
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+}
+
+// Verify Supabase JWT token
+async function verifyAuth(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { authenticated: false, error: 'Missing or invalid authorization header' };
+  }
+
+  const token = authHeader.substring(7);
+  
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    // If service key not configured, allow request but log warning
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[Auth] Service role key not configured - skipping auth in development');
+      return { authenticated: true, user: null };
+    }
+    return { authenticated: false, error: 'Auth service not configured' };
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return { authenticated: false, error: 'Invalid or expired token' };
+    }
+    
+    return { authenticated: true, user };
+  } catch (err) {
+    return { authenticated: false, error: 'Auth verification failed' };
+  }
+}
 
 export default async function handler(req, res) {
+  // Set CORS headers for all responses
+  setCorsHeaders(req, res);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     return res.status(200).end();
   }
 
@@ -19,6 +144,32 @@ export default async function handler(req, res) {
     return res.status(405).json({
       success: false,
       error: 'Method not allowed. Use POST.'
+    });
+  }
+
+  // Verify authentication
+  const auth = await verifyAuth(req);
+  if (!auth.authenticated) {
+    return res.status(401).json({
+      success: false,
+      error: auth.error || 'Unauthorized'
+    });
+  }
+
+  // Apply rate limiting based on user ID or IP
+  const rateLimitKey = auth.user?.id || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'anonymous';
+  const rateLimit = checkRateLimit(rateLimitKey);
+  
+  // Set rate limit headers
+  res.setHeader('X-RateLimit-Limit', RATE_LIMIT_MAX_REQUESTS);
+  res.setHeader('X-RateLimit-Remaining', rateLimit.remaining);
+  res.setHeader('X-RateLimit-Reset', Math.ceil(rateLimit.resetAt / 1000));
+  
+  if (!rateLimit.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: 'Too many requests. Please try again later.',
+      retryAfter: Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
     });
   }
 
@@ -37,26 +188,14 @@ export default async function handler(req, res) {
                          process.env.SUPPORT_EMAIL ||
                          'delivered@resend.dev';
 
-    // Log environment variable status (for debugging - remove in production if needed)
-    console.log('[Vercel API] Environment check:', {
-      hasViteResendKey: !!process.env.VITE_RESEND_API_KEY,
-      hasResendKey: !!process.env.RESEND_API_KEY,
-      hasApiKey: !!apiKey,
-      fromEmail,
-      supportEmail,
-      nodeEnv: process.env.NODE_ENV
-    });
-
     // Validate API key exists
     if (!apiKey) {
-      console.error('[Vercel API] RESEND_API_KEY not found in environment');
+      console.error('[Vercel API] Email service not configured');
       return res.status(500).json({ 
         success: false,
-        error: 'Email service not configured - API key missing. Please set VITE_RESEND_API_KEY or RESEND_API_KEY in Vercel environment variables.' 
+        error: 'Email service not configured'
       });
     }
-
-    console.log('[Vercel API] Initializing Resend with API key:', apiKey.substring(0, 10) + '...');
 
     // Initialize Resend with API key
     const resend = new Resend(apiKey);
@@ -65,20 +204,11 @@ export default async function handler(req, res) {
 
     // Validate required fields
     if (!to || !subject || !html) {
-      console.error('[Vercel API] Missing required fields:', { hasTo: !!to, hasSubject: !!subject, hasHtml: !!html });
       return res.status(400).json({ 
         success: false,
         error: 'Missing required fields: to, subject, html' 
       });
     }
-
-    console.log('[Vercel API] Sending email:', {
-      to: Array.isArray(to) ? to.join(', ') : to,
-      subject,
-      from: from || fromEmail,
-      hasHtml: !!html,
-      htmlLength: html?.length || 0
-    });
 
     // Send email via Resend
     const result = await resend.emails.send({
@@ -92,27 +222,20 @@ export default async function handler(req, res) {
     });
 
     if (result.error) {
-      console.error('[Vercel API] Resend API error:', {
-        message: result.error.message,
-        name: result.error.name,
-        fullError: result.error
-      });
+      console.error('[Vercel API] Email send failed');
       return res.status(500).json({
         success: false,
-        error: result.error.message || 'Failed to send email'
+        error: 'Failed to send email'
       });
     }
 
-    console.log('[Vercel API] Email sent successfully:', {
-      messageId: result.data?.id,
-      to: Array.isArray(to) ? to.join(', ') : to,
-      subject
-    });
-
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Vercel API] Email sent successfully:', {
+        messageId: result.data?.id,
+        to: Array.isArray(to) ? to.join(', ') : to,
+        subject
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -120,18 +243,11 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('[Vercel API] Error sending email:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    
-    // Set CORS headers even on error
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    console.error('[Vercel API] Error sending email:', error.message);
     
     return res.status(500).json({
       success: false,
-      error: error.message || 'Failed to send email'
+      error: 'Failed to send email'
     });
   }
 }

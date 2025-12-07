@@ -67,8 +67,8 @@ const SCHOOL_NAV_ITEMS: NavItem[] = [
 const TEACHER_NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', icon: Home, href: '/teacher/dashboard', roles: ['teacher'] },
   { label: 'Browse Jobs', icon: Search, href: '/jobs', roles: ['teacher'] },
-  { label: 'My Applications', icon: FileText, href: '/teacher/dashboard#applications', roles: ['teacher'] },
-  { label: 'Saved Jobs', icon: Bookmark, href: '/teacher/dashboard#favorites', roles: ['teacher'] },
+  { label: 'My Applications', icon: FileText, href: '/teacher/applications', roles: ['teacher'] },
+  { label: 'Saved Jobs', icon: Bookmark, href: '/teacher/saved-jobs', roles: ['teacher'] },
   { label: 'Messages', icon: MessageCircle, href: '/messages', roles: ['school', 'teacher'] },
   { label: 'Profile', icon: User, href: '/profile', roles: ['teacher'] },
 ];
@@ -185,14 +185,14 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
 
   const handleLogout = () => {
     console.log('[Sidebar] Logout - clearing session and redirecting');
-    
+
     // Clear all auth storage immediately (don't wait for signOut)
     localStorage.removeItem('perfectmatch-auth');
     sessionStorage.clear();
-    
+
     // Fire signOut in background (don't await - it hangs)
-    supabase.auth.signOut().catch(() => {});
-    
+    supabase.auth.signOut().catch(() => { });
+
     // Redirect immediately
     window.location.href = '/login';
   };
@@ -249,14 +249,15 @@ export function Sidebar({ isOpen = true, onClose, isMobile = false }: SidebarPro
       {/* Sidebar - Smooth slide with spring effect */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-card/98 backdrop-blur-md border-r border-border z-50',
+          'fixed left-0 top-0 bg-card/98 backdrop-blur-md border-r border-border z-50',
           'flex flex-col shadow-2xl',
           'transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
           'w-[280px] sm:w-72 lg:w-72', // Consistent width
           isMobile && !isOpen && '-translate-x-full',
           !isMobile && 'translate-x-0',
-          // Safe area for notched devices
-          'pb-safe-bottom'
+          // Safe area for notched devices and dynamic viewport height
+          'pb-safe-bottom',
+          isMobile ? 'h-[100dvh]' : 'h-full'
         )}
         data-sidebar
       >

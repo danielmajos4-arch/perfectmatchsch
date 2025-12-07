@@ -40,11 +40,19 @@ export interface AchievementProgress {
  * Circuit breaker: Stops trying after multiple failures to prevent spam
  * 
  * NOTE: Achievements are only for teachers. School users should not call this function.
+ * 
+ * DISABLED: Achievement system temporarily disabled to unblock file uploads.
+ * Re-enable after database setup is complete.
  */
 export async function checkAndUnlockAchievements(
   userId: string,
   achievementCode?: string
 ): Promise<Achievement[]> {
+  // DISABLED: Achievement system temporarily disabled
+  // Re-enable after database setup is complete
+  console.log('[Achievements] System disabled - skipping check');
+  return [];
+
   // Stop trying if system is disabled due to repeated failures
   if (achievementSystemDisabled) {
     return [];
@@ -116,8 +124,14 @@ export async function checkAndUnlockAchievements(
 /**
  * Get all unlocked achievements for a user
  * NOTE: Achievements are only for teachers. School users should not call this function.
+ * 
+ * DISABLED: Achievement system temporarily disabled to unblock file uploads.
  */
 export async function getUserAchievements(userId: string): Promise<Achievement[]> {
+  // DISABLED: Achievement system temporarily disabled
+  console.log('[Achievements] System disabled - returning empty array');
+  return [];
+
   // Verify user is a teacher before fetching achievements
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -155,10 +169,16 @@ export async function getUserAchievements(userId: string): Promise<Achievement[]
 /**
  * Get achievement progress for locked achievements
  * NOTE: Achievements are only for teachers. School users should not call this function.
+ * 
+ * DISABLED: Achievement system temporarily disabled to unblock file uploads.
  */
 export async function getUserAchievementProgress(
   userId: string
 ): Promise<AchievementProgress[]> {
+  // DISABLED: Achievement system temporarily disabled
+  console.log('[Achievements] System disabled - returning empty array');
+  return [];
+
   // Verify user is a teacher before fetching achievement progress
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();

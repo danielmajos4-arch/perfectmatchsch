@@ -5,8 +5,30 @@
  * The server handles all Resend API communication.
  */
 
+import { supabase } from './supabaseClient';
+
 const RESEND_FROM_EMAIL = import.meta.env.VITE_RESEND_FROM_EMAIL || import.meta.env.VITE_FROM_EMAIL || 'noreply@perfectmatchschools.com';
 const RESEND_SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'support@perfectmatchschools.com';
+
+/**
+ * Get authorization header with current session token
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch (error) {
+    // Continue without auth header - server will reject if auth required
+  }
+  
+  return headers;
+}
 
 export interface EmailOptions {
   to: string | string[];
@@ -27,15 +49,17 @@ export interface EmailResult {
 /**
  * Send email via server-side endpoint (avoids CORS issues)
  * The server handles all Resend API communication
+ * Requires authenticated user session
  */
 export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
   try {
+    const headers = await getAuthHeaders();
+    
     // Call YOUR server endpoint, not Resend directly
     const response = await fetch('/api/send-email', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
+      credentials: 'include',
       body: JSON.stringify({
         to: Array.isArray(options.to) ? options.to : [options.to],
         subject: options.subject,
@@ -50,19 +74,11 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
     const data = await response.json();
 
     if (!response.ok) {
-      const errorMessage = data.error || 'Failed to send email';
-      console.error('[Resend] Server error:', errorMessage);
       return {
         success: false,
-        error: errorMessage
+        error: data.error || 'Failed to send email'
       };
     }
-
-    console.log('[Resend] Email sent successfully:', {
-      to: options.to,
-      subject: options.subject,
-      messageId: data.messageId,
-    });
 
     return {
       success: true,
@@ -70,7 +86,6 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
     };
 
   } catch (error: any) {
-    console.error('[Resend] Error sending email:', error);
     return {
       success: false,
       error: error.message || 'Failed to send email'
@@ -89,8 +104,6 @@ export async function sendTemplateEmail(
   // This would use Resend's template API if available
   // For now, we'll use the regular sendEmail function
   // Templates should be rendered before calling this
-  console.warn('[Resend] Template email not fully implemented. Use sendEmail with rendered template.');
-  
   return {
     success: false,
     error: 'Template email not implemented. Use sendEmail with rendered template.',

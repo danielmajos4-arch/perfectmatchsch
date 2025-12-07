@@ -11,12 +11,6 @@ export async function uploadProfileImage(
   userId: string,
   file: File
 ): Promise<{ url: string; error: null } | { url: null; error: string }> {
-  console.log('[Logo Upload] Starting upload:', {
-    name: file.name,
-    size: file.size,
-    type: file.type
-  });
-
   try {
     // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -30,38 +24,30 @@ export async function uploadProfileImage(
       return { url: null, error: 'File size too large. Maximum size is 5MB.' };
     }
 
-    // Create file path: user-id/timestamp-filename (bucket name is already specified in .from())
+    // Create file path: user-id/timestamp-filename
     const timestamp = Date.now();
     const fileExt = file.name.split('.').pop();
     const filePath = `${userId}/${timestamp}.${fileExt}`;
-
-    console.log('[Logo Upload] Uploading to:', filePath);
 
     // Upload file
     const { data, error } = await supabase.storage
       .from(PROFILE_IMAGES_BUCKET)
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: true, // Replace if exists
+        upsert: true,
       });
 
     if (error) {
-      console.error('[Logo Upload] Upload error:', error);
       return { url: null, error: error.message };
     }
-
-    console.log('[Logo Upload] Upload successful');
 
     // Get public URL
     const { data: urlData } = supabase.storage
       .from(PROFILE_IMAGES_BUCKET)
       .getPublicUrl(filePath);
 
-    console.log('[Logo Upload] Public URL:', urlData.publicUrl);
-
     return { url: urlData.publicUrl, error: null };
   } catch (error: any) {
-    console.error('[Logo Upload] Upload error:', error);
     return { url: null, error: error.message || 'Failed to upload image' };
   }
 }
@@ -106,7 +92,6 @@ export async function uploadDocument(
       });
 
     if (error) {
-      console.error('Upload error:', error);
       return { url: null, error: error.message };
     }
 
@@ -117,7 +102,6 @@ export async function uploadDocument(
 
     return { url: urlData.publicUrl, error: null };
   } catch (error: any) {
-    console.error('Upload error:', error);
     return { url: null, error: error.message || 'Failed to upload document' };
   }
 }

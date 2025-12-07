@@ -557,6 +557,117 @@ export function savedSearchAlertTemplate(data: {
 /**
  * Replace template variables with actual values
  */
+/**
+ * Profile Viewed Email (Teacher)
+ */
+export function profileViewedTemplate(data: {
+  teacherName: string;
+  schoolName: string;
+  schoolLogo?: string;
+  dashboardUrl: string;
+}): string {
+  const content = `
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">Hi ${data.teacherName},</p>
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+      Great news! <strong style="color: ${BRAND_COLORS.primary};">${data.schoolName}</strong> viewed your profile.
+    </p>
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+      This could be a sign they're interested in your teaching style and experience. Keep your profile updated and respond to messages promptly to increase your chances!
+    </p>
+    <p style="margin: 15px 0 0 0; font-size: 16px; line-height: 1.6;">
+      View your profile analytics and see who's been checking you out.
+    </p>
+  `;
+
+  return baseEmailTemplate(
+    `${data.schoolName} Viewed Your Profile`,
+    content,
+    'View Dashboard',
+    data.dashboardUrl
+  );
+}
+
+/**
+ * Weekly Digest Email (Teacher)
+ */
+export function weeklyDigestTemplate(data: {
+  teacherName: string;
+  weekStats: {
+    newApplications: number;
+    profileViews: number;
+    newMatches: number;
+    messagesReceived: number;
+  };
+  topMatches: Array<{
+    title: string;
+    schoolName: string;
+    location: string;
+    matchScore: number;
+    jobUrl?: string;
+  }>;
+  dashboardUrl: string;
+}): string {
+  const statsContent = `
+    <div style="margin: 20px 0; padding: 20px; background-color: ${BRAND_COLORS.background}; border-radius: 6px;">
+      <h3 style="margin: 0 0 15px 0; font-size: 18px; color: ${BRAND_COLORS.text}; font-weight: 600;">Your Week in Review</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div style="text-align: center; padding: 15px; background-color: ${BRAND_COLORS.white}; border-radius: 4px;">
+          <div style="font-size: 32px; font-weight: 700; color: ${BRAND_COLORS.primary}; margin-bottom: 5px;">${data.weekStats.newApplications}</div>
+          <div style="font-size: 14px; color: ${BRAND_COLORS.textLight};">Applications Sent</div>
+        </div>
+        <div style="text-align: center; padding: 15px; background-color: ${BRAND_COLORS.white}; border-radius: 4px;">
+          <div style="font-size: 32px; font-weight: 700; color: ${BRAND_COLORS.primary}; margin-bottom: 5px;">${data.weekStats.profileViews}</div>
+          <div style="font-size: 14px; color: ${BRAND_COLORS.textLight};">Profile Views</div>
+        </div>
+        <div style="text-align: center; padding: 15px; background-color: ${BRAND_COLORS.white}; border-radius: 4px;">
+          <div style="font-size: 32px; font-weight: 700; color: ${BRAND_COLORS.primary}; margin-bottom: 5px;">${data.weekStats.newMatches}</div>
+          <div style="font-size: 14px; color: ${BRAND_COLORS.textLight};">New Matches</div>
+        </div>
+        <div style="text-align: center; padding: 15px; background-color: ${BRAND_COLORS.white}; border-radius: 4px;">
+          <div style="font-size: 32px; font-weight: 700; color: ${BRAND_COLORS.primary}; margin-bottom: 5px;">${data.weekStats.messagesReceived}</div>
+          <div style="font-size: 14px; color: ${BRAND_COLORS.textLight};">Messages</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const matchesContent = data.topMatches.length > 0 ? `
+    <div style="margin: 20px 0;">
+      <h3 style="margin: 0 0 15px 0; font-size: 18px; color: ${BRAND_COLORS.text}; font-weight: 600;">Top Matches This Week</h3>
+      ${data.topMatches.map((job, index) => `
+        <div style="margin: ${index > 0 ? '15px' : '0'} 0 15px 0; padding: 20px; background-color: ${BRAND_COLORS.background}; border-radius: 6px; border-left: 4px solid ${BRAND_COLORS.primary};">
+          <h4 style="margin: 0 0 10px 0; font-size: 16px; color: ${BRAND_COLORS.text}; font-weight: 600;">${job.title}</h4>
+          <p style="margin: 5px 0; font-size: 14px; color: ${BRAND_COLORS.textLight};">
+            ${job.schoolName} • ${job.location}
+          </p>
+          <p style="margin: 10px 0 0 0; font-size: 14px; color: ${BRAND_COLORS.primary}; font-weight: 600;">
+            ${job.matchScore}% match
+          </p>
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  const content = `
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">Hi ${data.teacherName},</p>
+    <p style="margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+      Here's your weekly summary of activity on Perfect Match Schools:
+    </p>
+    ${statsContent}
+    ${matchesContent}
+    <p style="margin: 20px 0 0 0; font-size: 16px; line-height: 1.6;">
+      Keep up the great work! Continue applying to positions and engaging with schools to increase your chances of finding the perfect match.
+    </p>
+  `;
+
+  return baseEmailTemplate(
+    'Your Weekly Job Search Summary',
+    content,
+    'View Dashboard',
+    data.dashboardUrl
+  );
+}
+
 export function replaceTemplateVariables(template: string, variables: Record<string, string>): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
