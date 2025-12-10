@@ -24,6 +24,10 @@ interface TeacherProfileEditorProps {
 const SUBJECTS = ['Math', 'Science', 'English', 'History', 'Social Studies', 'Art', 'Music', 'PE', 'Special Ed', 'ESL', 'Technology', 'Other'];
 const GRADE_LEVELS = ['Pre-K', 'K', '1-2', '3-5', '6-8', '9-12', 'College'];
 const YEARS_EXPERIENCE = ['0-1 years', '2-5 years', '6-10 years', '11-15 years', '16+ years'];
+const MIN_BIO_LENGTH = 50;
+const MAX_BIO_LENGTH = 500;
+const MIN_PHILOSOPHY_LENGTH = 30;
+const MAX_PHILOSOPHY_LENGTH = 400;
 
 export function TeacherProfileEditor({ teacher, userId, onSave }: TeacherProfileEditorProps) {
   const { toast } = useToast();
@@ -390,10 +394,15 @@ export function TeacherProfileEditor({ teacher, userId, onSave }: TeacherProfile
             <Textarea
               id="bio"
               value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= MAX_BIO_LENGTH) {
+                  setFormData({ ...formData, bio: value });
+                }
+              }}
               placeholder="Tell us about yourself..."
               className="min-h-[120px] text-base bg-background/50 focus:bg-background transition-colors resize-y"
-              maxLength={500}
+              maxLength={MAX_BIO_LENGTH}
             />
           ) : (
             <div className="p-4 bg-muted/30 rounded-lg border border-border/50 min-h-[80px]">
@@ -402,7 +411,7 @@ export function TeacherProfileEditor({ teacher, userId, onSave }: TeacherProfile
           )}
           {isEditing && (
             <p className="text-xs text-muted-foreground text-right">
-              {formData.bio.length}/500 characters
+              {formData.bio.length}/{MAX_BIO_LENGTH} characters (minimum {MIN_BIO_LENGTH} required)
             </p>
           )}
         </div>
@@ -482,9 +491,15 @@ export function TeacherProfileEditor({ teacher, userId, onSave }: TeacherProfile
             <Textarea
               id="teaching_philosophy"
               value={formData.teaching_philosophy}
-              onChange={(e) => setFormData({ ...formData, teaching_philosophy: e.target.value })}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length <= MAX_PHILOSOPHY_LENGTH) {
+                  setFormData({ ...formData, teaching_philosophy: value });
+                }
+              }}
               placeholder="Share your teaching philosophy..."
               className="min-h-[150px] text-base bg-background/50 focus:bg-background transition-colors resize-y"
+              maxLength={MAX_PHILOSOPHY_LENGTH}
             />
           ) : (
             <div className="p-4 bg-muted/30 rounded-lg border border-border/50 min-h-[100px]">
@@ -492,6 +507,11 @@ export function TeacherProfileEditor({ teacher, userId, onSave }: TeacherProfile
                 {formData.teaching_philosophy || 'No philosophy added yet'}
               </p>
             </div>
+          )}
+          {isEditing && (
+            <p className="text-xs text-muted-foreground text-right">
+              {formData.teaching_philosophy.length}/{MAX_PHILOSOPHY_LENGTH} characters (minimum {MIN_PHILOSOPHY_LENGTH} required)
+            </p>
           )}
         </div>
 

@@ -27,8 +27,9 @@ const YEARS_EXPERIENCE_OPTIONS = [
 ];
 
 const MIN_BIO_LENGTH = 50;
-const MIN_BIO_MAX = 500;
+const MAX_BIO_LENGTH = 500;
 const MIN_PHILOSOPHY_LENGTH = 30;
+const MAX_PHILOSOPHY_LENGTH = 400;
 
 interface TeacherProfileData {
   full_name: string;
@@ -159,11 +160,19 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
   }, []);
 
   const handleBioChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setFormData(prev => ({ ...prev, bio: e.target.value }));
+    const value = e.target.value;
+    // Enforce max character limit
+    if (value.length <= MAX_BIO_LENGTH) {
+      setFormData(prev => ({ ...prev, bio: value }));
+    }
   }, []);
 
   const handleTeachingPhilosophyChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setFormData(prev => ({ ...prev, teaching_philosophy: e.target.value }));
+    const value = e.target.value;
+    // Enforce max character limit
+    if (value.length <= MAX_PHILOSOPHY_LENGTH) {
+      setFormData(prev => ({ ...prev, teaching_philosophy: value }));
+    }
   }, []);
 
   const validateForm = useCallback((): boolean => {
@@ -181,13 +190,15 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
     if (formData.grade_levels.length === 0) newErrors.grade_levels = 'Please select at least one grade level';
     if (!formData.bio.trim()) {
       newErrors.bio = 'Bio is required';
-    } else if (formData.bio.length < MIN_BIO_LENGTH || formData.bio.length > MIN_BIO_MAX) {
-      newErrors.bio = `Bio must be between ${MIN_BIO_LENGTH} and ${MIN_BIO_MAX} characters`;
+    } else if (formData.bio.length < MIN_BIO_LENGTH || formData.bio.length > MAX_BIO_LENGTH) {
+      newErrors.bio = `Bio must be between ${MIN_BIO_LENGTH} and ${MAX_BIO_LENGTH} characters`;
     }
     if (!formData.teaching_philosophy.trim()) {
       newErrors.teaching_philosophy = 'Teaching philosophy is required';
     } else if (formData.teaching_philosophy.trim().length < MIN_PHILOSOPHY_LENGTH) {
       newErrors.teaching_philosophy = `Teaching philosophy must be at least ${MIN_PHILOSOPHY_LENGTH} characters`;
+    } else if (formData.teaching_philosophy.length > MAX_PHILOSOPHY_LENGTH) {
+      newErrors.teaching_philosophy = `Teaching philosophy must not exceed ${MAX_PHILOSOPHY_LENGTH} characters`;
     }
 
     setErrors(newErrors);
@@ -217,8 +228,8 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
       Boolean(formData.years_experience && formData.years_experience !== '0'),
       formData.subjects.length > 0,
       formData.grade_levels.length > 0,
-      Boolean(formData.bio.trim() && formData.bio.length >= MIN_BIO_LENGTH),
-      Boolean(formData.teaching_philosophy.trim() && formData.teaching_philosophy.trim().length >= MIN_PHILOSOPHY_LENGTH),
+      Boolean(formData.bio.trim() && formData.bio.length >= MIN_BIO_LENGTH && formData.bio.length <= MAX_BIO_LENGTH),
+      Boolean(formData.teaching_philosophy.trim() && formData.teaching_philosophy.trim().length >= MIN_PHILOSOPHY_LENGTH && formData.teaching_philosophy.length <= MAX_PHILOSOPHY_LENGTH),
     ];
   }, [formData]);
 
@@ -391,7 +402,7 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
               <p className="text-sm text-destructive" data-testid="error-bio">{errors.bio}</p>
             ) : (
               <p className="text-sm text-muted-foreground" data-testid="text-bio-count">
-                {formData.bio.length} / {MIN_BIO_MAX} characters
+                {formData.bio.length} / {MAX_BIO_LENGTH} characters (minimum {MIN_BIO_LENGTH} required)
               </p>
             )}
           </div>
@@ -408,16 +419,19 @@ export const TeacherProfileStep = memo(function TeacherProfileStep({ onNext, ini
             onChange={handleTeachingPhilosophyChange}
             placeholder="Describe your teaching philosophy and approach..."
             rows={3}
+            className={errors.teaching_philosophy ? 'border-destructive' : ''}
           />
-          {errors.teaching_philosophy ? (
-            <p className="text-sm text-destructive mt-1" data-testid="error-teaching-philosophy">
-              {errors.teaching_philosophy}
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground mt-1">
-              {formData.teaching_philosophy.length} characters
-            </p>
-          )}
+          <div className="flex justify-between mt-1">
+            {errors.teaching_philosophy ? (
+              <p className="text-sm text-destructive" data-testid="error-teaching-philosophy">
+                {errors.teaching_philosophy}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground" data-testid="text-philosophy-count">
+                {formData.teaching_philosophy.length} / {MAX_PHILOSOPHY_LENGTH} characters (minimum {MIN_PHILOSOPHY_LENGTH} required)
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
