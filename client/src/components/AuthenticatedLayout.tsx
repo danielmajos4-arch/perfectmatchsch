@@ -196,7 +196,7 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
                       // Clear storage immediately and redirect
                       localStorage.removeItem('perfectmatch-auth');
                       sessionStorage.clear();
-                      supabase.auth.signOut().catch(() => {});
+                      supabase.auth.signOut().catch(() => { });
                       window.location.href = '/login';
                     }}
                     className="text-destructive"
@@ -222,11 +222,11 @@ export function AuthenticatedLayout({ children, showMobileNav = true }: Authenti
       <main
         className={cn(
           'pt-14 sm:pt-16 transition-all duration-300 ease-in-out',
-          'lg:pl-72', // Sidebar width on desktop (288px = 72 * 4)
+          'lg:pl-72', // Sidebar width on desktop
           'min-h-screen bg-background'
         )}
       >
-        <div className="px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-8 max-w-7xl mx-auto">
+        <div className="px-4 py-6 sm:px-6 sm:py-8 md:px-8 lg:px-10 max-w-7xl mx-auto w-full">
           {children}
         </div>
       </main>

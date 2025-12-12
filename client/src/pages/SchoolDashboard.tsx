@@ -1047,14 +1047,14 @@ export default function SchoolDashboard() {
         />
       )}
 
-      <div className="px-4 md:px-8 py-8 md:py-12 max-w-6xl mx-auto" data-tour="dashboard-header">
+      <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-6xl mx-auto" data-tour="dashboard-header">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 md:mb-8">
-          <div className="flex-1">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-2 bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 md:mb-8">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent break-words">
               School Dashboard
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Manage your job postings and applications</p>
+            <p className="text-xs sm:text-sm md:text-base text-muted-foreground">Manage your job postings and applications</p>
             {user?.user_metadata?.role === 'teacher' && achievements.length > 0 && user?.id && (
               <div className="flex items-center gap-2 flex-wrap mt-2">
                 <span className="text-xs text-muted-foreground">Achievements:</span>
@@ -1067,17 +1067,17 @@ export default function SchoolDashboard() {
               resetForm();
               setShowJobModal(true);
             }}
-            className="gap-2 h-11 w-full sm:w-auto"
+            className="gap-2 h-10 sm:h-11 w-full sm:w-auto text-sm sm:text-base"
             data-testid="button-post-job"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
             <span>Post Job</span>
           </Button>
         </div>
 
         {/* Dashboard Stats */}
         {jobsLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[1, 2, 3, 4].map((i) => (
               <Card key={i} className="p-6">
                 <Skeleton className="h-5 w-24 mb-2" />
@@ -1086,77 +1086,75 @@ export default function SchoolDashboard() {
             ))}
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8" data-tour="stats-cards">
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Briefcase className="h-5 w-5 text-primary" />
-                <span className="text-sm text-muted-foreground">Active Jobs</span>
+          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-5 mb-6 sm:mb-8" data-tour="stats-cards">
+            <Card className="p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                <Briefcase className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-muted-foreground truncate">Active Jobs</span>
               </div>
-              <p className="text-3xl font-bold text-foreground">{stats.activeJobs}</p>
+              <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">{stats.activeJobs}</p>
             </Card>
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Users className="h-5 w-5 text-primary" />
-                <span className="text-sm text-muted-foreground">Total Applications</span>
+            <Card className="p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-muted-foreground truncate">Total Applications</span>
               </div>
-              <p className="text-3xl font-bold text-foreground">{stats.totalApplications}</p>
+              <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">{stats.totalApplications}</p>
             </Card>
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <Clock className="h-5 w-5 text-primary" />
-                <span className="text-sm text-muted-foreground">Pending Reviews</span>
+            <Card className="p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-muted-foreground truncate">Pending Reviews</span>
               </div>
-              <p className="text-3xl font-bold text-foreground">{stats.pendingApplications}</p>
+              <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">{stats.pendingApplications}</p>
             </Card>
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <span className="text-sm text-muted-foreground">Recent (7 days)</span>
+            <Card className="p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-muted-foreground truncate">Recent (7 days)</span>
               </div>
-              <p className="text-3xl font-bold text-foreground">{stats.recentApplications}</p>
+              <p className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">{stats.recentApplications}</p>
             </Card>
           </div>
         ) : null}
 
         {/* Recent Applications Widget */}
         {recentApplications && recentApplications.length > 0 && (
-          <Card className="p-6 mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Recent Applications</h2>
+          <Card className="p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3 xs:gap-4 mb-4">
+              <h2 className="text-base sm:text-lg font-semibold">Recent Applications</h2>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => {
                   setActiveTab('candidates');
-                  // Scroll to candidates section after tab switch
                   setTimeout(() => {
                     const element = document.getElementById('applications');
                     if (element) {
                       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } else {
-                      // Fallback: scroll to top of candidates tab
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }
                   }, 100);
                 }}
-                className="text-sm"
+                className="text-xs sm:text-sm w-full xs:w-auto"
               >
                 View All
               </Button>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {recentApplications.slice(0, 5).map((app) => (
-                <div key={app.id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+                <div key={app.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors gap-2 sm:gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
+                    <p className="text-xs sm:text-sm font-medium truncate">
                       {(app as any).jobs?.title || 'Job Application'}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(app.applied_at), { addSuffix: true })}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={app.status === 'pending' ? 'secondary' : 'default'}>
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                    <Badge variant={app.status === 'pending' ? 'secondary' : 'default'} className="shrink-0 text-xs">
                       {app.status}
                     </Badge>
                     <Button
@@ -1164,59 +1162,27 @@ export default function SchoolDashboard() {
                       size="sm"
                       onClick={async () => {
                         try {
-                          // Get job_id from application
                           const jobId = (app as any).job_id;
+                          if (!user?.id || !app.teacher_id) return;
 
-                          if (!user?.id) {
-                            toast({
-                              title: 'Error',
-                              description: 'Please log in to message applicants.',
-                              variant: 'destructive',
-                            });
-                            return;
-                          }
-
-                          if (!app.teacher_id) {
-                            toast({
-                              title: 'Error',
-                              description: 'Missing teacher information.',
-                              variant: 'destructive',
-                            });
-                            return;
-                          }
-
-                          // Get or create conversation (with timeout)
-                          const convPromise = getOrCreateConversation(
-                            app.teacher_id,
-                            user.id,
-                            jobId
-                          );
+                          const convPromise = getOrCreateConversation(app.teacher_id, user.id, jobId);
                           const timeoutPromise = new Promise<never>((_, reject) => {
-                            setTimeout(() => reject(new Error('Conversation creation timed out. Please try again.')), 10000);
+                            setTimeout(() => reject(new Error('Timeout')), 10000);
                           });
-
-                          const result = await Promise.race([convPromise, timeoutPromise]) as { conversation: any; isNew: boolean };
-
-                          if (!result?.conversation?.id) {
-                            throw new Error('Failed to create or retrieve conversation.');
+                          const result = await Promise.race([convPromise, timeoutPromise]) as { conversation: any };
+                          if (result?.conversation?.id) {
+                            setLocation(`/messages?conversation=${result.conversation.id}`);
                           }
-
-                          // Navigate to messages
-                          setLocation(`/messages?conversation=${result.conversation.id}`);
-                        } catch (error: any) {
-                          console.error('Error opening conversation:', error);
-                          toast({
-                            title: 'Error',
-                            description: error.message || 'Failed to open conversation. Please try again.',
-                            variant: 'destructive',
-                          });
+                        } catch (error) {
+                          console.error('Error opening conversation', error);
                         }
                       }}
-                      className="h-8"
+                      className="h-8 w-8 sm:w-auto sm:px-2"
                       title="Message applicant"
                       disabled={!app.teacher_id}
                     >
                       <MessageCircle className="h-4 w-4" />
+                      <span className="hidden sm:inline ml-2">Message</span>
                     </Button>
                   </div>
                 </div>
@@ -1227,46 +1193,50 @@ export default function SchoolDashboard() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
-            <TabsTrigger value="jobs">Job Postings</TabsTrigger>
-            <TabsTrigger value="candidates" data-tour="candidates-tab">Candidates</TabsTrigger>
-            <TabsTrigger value="offers">Offers</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </TabsList>
+          <div className="w-full overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+            <TabsList className="grid min-w-[280px] w-full grid-cols-2 sm:grid-cols-4 h-auto mb-4 sm:mb-6 gap-1">
+              <TabsTrigger value="jobs" className="h-10 sm:h-11 text-xs sm:text-sm md:text-base px-2 sm:px-4">Job Postings</TabsTrigger>
+              <TabsTrigger value="candidates" data-tour="candidates-tab" className="h-10 sm:h-11 text-xs sm:text-sm md:text-base px-2 sm:px-4">Candidates</TabsTrigger>
+              <TabsTrigger value="offers" className="h-10 sm:h-11 text-xs sm:text-sm md:text-base px-2 sm:px-4">Offers</TabsTrigger>
+              <TabsTrigger value="analytics" className="h-10 sm:h-11 text-xs sm:text-sm md:text-base px-2 sm:px-4">Analytics</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="jobs" className="space-y-4">
             {/* Search and Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 mb-4 sm:mb-6">
+              <div className="flex-1 relative min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                 <Input
                   placeholder="Search jobs..."
                   value={jobSearchQuery}
                   onChange={(e) => setJobSearchQuery(e.target.value)}
-                  className="h-12 pl-10"
+                  className="h-10 sm:h-12 pl-9 sm:pl-10 w-full text-sm sm:text-base"
                 />
               </div>
-              <Select value={jobFilterDepartment} onValueChange={setJobFilterDepartment}>
-                <SelectTrigger className="h-12 w-full sm:w-[180px]">
-                  <SelectValue placeholder="Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {DEPARTMENTS.map(dept => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={jobFilterStatus} onValueChange={setJobFilterStatus}>
-                <SelectTrigger className="h-12 w-full sm:w-[180px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col xs:flex-row xs:flex-wrap gap-2 sm:gap-3 w-full lg:w-auto">
+                <Select value={jobFilterDepartment} onValueChange={setJobFilterDepartment}>
+                  <SelectTrigger className="h-10 sm:h-12 w-full xs:w-auto min-w-[140px] text-sm sm:text-base">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {DEPARTMENTS.map(dept => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={jobFilterStatus} onValueChange={setJobFilterStatus}>
+                  <SelectTrigger className="h-10 sm:h-12 w-full xs:w-auto min-w-[140px] text-sm sm:text-base">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Job List */}
@@ -1281,63 +1251,71 @@ export default function SchoolDashboard() {
                 ))}
               </div>
             ) : filteredJobs && filteredJobs.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {filteredJobs.map((job) => (
-                  <Card key={job.id} className="p-6" data-testid={`card-job-${job.id}`}>
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                  <Card key={job.id} className="p-3 sm:p-4 md:p-6" data-testid={`card-job-${job.id}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <Link href={`/jobs/${job.id}`} className="text-xl font-semibold text-primary hover:underline block">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 xs:gap-3 mb-2 sm:mb-3">
+                          <Link href={`/jobs/${job.id}`} className="text-base sm:text-lg md:text-xl font-semibold text-primary hover:underline block break-words pr-2">
                             {job.title}
                           </Link>
-                          <Badge variant={job.is_active ? 'default' : 'secondary'} className="rounded-full flex-shrink-0">
+                          <Badge variant={job.is_active ? 'default' : 'secondary'} className="rounded-full flex-shrink-0 w-fit text-xs">
                             {job.is_active ? 'Active' : 'Closed'}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">{job.location}</p>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          <Badge variant="secondary" className="rounded-full">
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3 flex items-center gap-1">
+                          <span className="truncate">{job.location}</span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                          <Badge variant="outline" className="rounded-full bg-muted/30 text-xs">
                             {job.department || job.subject}
                           </Badge>
-                          <Badge variant="secondary" className="rounded-full">
+                          <Badge variant="outline" className="rounded-full bg-muted/30 text-xs">
                             {job.grade_level}
                           </Badge>
-                          <Badge variant="secondary" className="rounded-full">
+                          <Badge variant="outline" className="rounded-full bg-muted/30 text-xs">
                             {job.job_type}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
-                          <span>{job.applications?.length || 0} applications</span>
-                          <span>•</span>
-                          <span>Posted {formatDistanceToNow(new Date(job.posted_at), { addSuffix: true })}</span>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground mt-2">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3 flex-shrink-0" />
+                            {job.applications?.length || 0} apps
+                          </span>
+                          <span className="hidden xs:inline">•</span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 flex-shrink-0" />
+                            {formatDistanceToNow(new Date(job.posted_at), { addSuffix: true })}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 sm:flex-col sm:flex-nowrap">
+                      <div className="flex flex-wrap gap-2 sm:flex-col sm:flex-nowrap pt-2 sm:pt-0 border-t sm:border-t-0 border-border mt-2 sm:mt-0 w-full sm:w-auto">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleEditJob(job)}
-                          className="h-10 gap-2"
+                          className="h-9 sm:h-10 gap-1.5 sm:gap-2 flex-1 sm:flex-grow-0 text-xs sm:text-sm"
                         >
-                          <Edit className="h-4 w-4" />
-                          <span className="hidden sm:inline">Edit</span>
+                          <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <span className="inline">Edit</span>
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleToggleJobStatus(job)}
-                          className="h-10 gap-2"
+                          className="h-9 sm:h-10 gap-1.5 sm:gap-2 flex-1 sm:flex-grow-0 text-xs sm:text-sm"
                           disabled={toggleJobStatusMutation.isPending}
                         >
                           {job.is_active ? (
                             <>
-                              <X className="h-4 w-4" />
-                              <span className="hidden sm:inline">Close</span>
+                              <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              <span className="inline">Close</span>
                             </>
                           ) : (
                             <>
-                              <CheckCircle className="h-4 w-4" />
-                              <span className="hidden sm:inline">Reopen</span>
+                              <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              <span className="inline">Open</span>
                             </>
                           )}
                         </Button>
@@ -1345,22 +1323,22 @@ export default function SchoolDashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => setDeleteJobId(job.id)}
-                          className="h-10 gap-2 text-destructive hover:text-destructive"
+                          className="h-9 sm:h-10 gap-1.5 sm:gap-2 flex-1 sm:flex-grow-0 text-xs sm:text-sm text-destructive hover:text-destructive"
                         >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="hidden sm:inline">Delete</span>
+                          <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <span className="inline">Delete</span>
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
                           onClick={() => {
                             setActiveTab('candidates');
                             // Could filter by job ID here
                           }}
-                          className="h-10 gap-2"
+                          className="h-9 sm:h-10 gap-1.5 sm:gap-2 flex-1 sm:flex-grow-0 text-xs sm:text-sm"
                         >
-                          <Eye className="h-4 w-4" />
-                          <span className="hidden sm:inline">View Apps</span>
+                          <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <span className="inline">View</span>
                         </Button>
                       </div>
                     </div>
@@ -1395,13 +1373,13 @@ export default function SchoolDashboard() {
 
           <TabsContent value="candidates">
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">Candidate Pipeline</h2>
-                    <p className="text-muted-foreground">Manage applications across all your jobs</p>
+              <CardContent className="pt-4 sm:pt-6 overflow-x-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className="min-w-0">
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold break-words">Candidate Pipeline</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage applications across all your jobs</p>
                   </div>
-                  <Button onClick={() => setShowManualCandidateModal(true)}>
+                  <Button onClick={() => setShowManualCandidateModal(true)} className="w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Candidate
                   </Button>
@@ -1417,11 +1395,11 @@ export default function SchoolDashboard() {
           {/* Offers Tab */}
           <TabsContent value="offers">
             <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold">Job Offers</h2>
-                    <p className="text-muted-foreground">Track all offers sent to candidates</p>
+              <CardContent className="p-4 sm:p-6 overflow-x-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className="min-w-0">
+                    <h2 className="text-xl sm:text-2xl font-bold break-words">Job Offers</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">Track all offers sent to candidates</p>
                   </div>
                 </div>
 
@@ -1432,7 +1410,9 @@ export default function SchoolDashboard() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics">
-            {user?.id && <SchoolAnalyticsDashboard schoolId={user.id} />}
+            <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+              {user?.id && <SchoolAnalyticsDashboard schoolId={user.id} />}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

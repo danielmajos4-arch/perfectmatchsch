@@ -215,8 +215,14 @@ export async function getUserAchievementProgress(
 
 /**
  * Get all available achievements (for display)
+ * 
+ * DISABLED: Achievement system temporarily disabled to unblock file uploads.
  */
 export async function getAllAchievements(): Promise<Achievement[]> {
+  // DISABLED: Achievement system temporarily disabled
+  console.log('[Achievements] System disabled - returning empty array');
+  return [];
+
   try {
     const { data, error } = await supabase
       .from('achievements')

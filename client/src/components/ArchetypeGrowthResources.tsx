@@ -34,6 +34,8 @@ export function ArchetypeGrowthResources({ teacher }: ArchetypeGrowthResourcesPr
       return data;
     },
     enabled: !!teacher.archetype,
+    staleTime: 1000 * 60 * 30, // 30 minutes (archetype info rarely changes)
+    gcTime: 1000 * 60 * 60, // 1 hour
   });
 
   const resources: GrowthResource[] = [

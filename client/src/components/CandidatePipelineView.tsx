@@ -163,25 +163,25 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-2">Candidate Pipeline</h2>
-          <p className="text-sm text-muted-foreground">Drag and drop candidates to move them through stages</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground mb-1 sm:mb-2 break-words">Candidate Pipeline</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Drag and drop candidates to move them through stages</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{candidates?.length || 0} Total</span>
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 bg-muted rounded-lg">
+            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs sm:text-sm font-medium">{candidates?.length || 0} Total</span>
           </div>
           {/* Add "Add Stage" button here in future */}
         </div>
       </div>
 
       {/* Kanban Board */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-max sm:min-w-0">
+      <div className="overflow-x-auto pb-4 -mx-3 sm:mx-0 px-3 sm:px-0">
+        <div className="flex gap-3 sm:gap-4 min-w-max sm:min-w-0">
           {stages?.map((stage) => {
             const columnCandidates = getCandidatesByStatus(stage.name);
             const config = STAGE_CONFIG[stage.name] || DEFAULT_STAGE_CONFIG;
@@ -190,19 +190,19 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
             return (
               <div
                 key={stage.id}
-                className="flex-shrink-0 w-72 sm:w-80"
+                className="flex-shrink-0 w-64 xs:w-72 sm:w-80"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage.name)} // Passing stage name as status
               >
                 <Card className={`h-full ${config.bgColor} border-2`}>
-                  <CardHeader className="p-4 pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className={`p-2 rounded-lg ${config.bgColor}`}>
-                          <Icon className={`h-4 w-4 ${config.color}`} />
+                  <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <div className={`p-1.5 sm:p-2 rounded-lg ${config.bgColor} flex-shrink-0`}>
+                          <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${config.color}`} />
                         </div>
-                        <div>
-                          <CardTitle className="text-sm font-semibold">{stage.name}</CardTitle>
+                        <div className="min-w-0">
+                          <CardTitle className="text-xs sm:text-sm font-semibold truncate">{stage.name}</CardTitle>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {columnCandidates.length} candidate{columnCandidates.length !== 1 ? 's' : ''}
                           </p>
@@ -211,8 +211,8 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
                       {columnCandidates.length > 0 && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
+                            <Button variant="ghost" size="sm" className="h-7 w-7 sm:h-8 sm:w-8 p-0 flex-shrink-0 touch-manipulation">
+                              <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -231,8 +231,8 @@ export function CandidatePipelineView({ schoolId, jobId }: CandidatePipelineView
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="p-3">
-                    <ScrollArea className="h-[600px] sm:h-[700px]">
+                  <CardContent className="p-2 sm:p-3">
+                    <ScrollArea className="h-[500px] sm:h-[600px] md:h-[700px]">
                       <div className="space-y-3">
                         {columnCandidates.length === 0 ? (
                           <div className="text-center py-8 text-sm text-muted-foreground opacity-70">
@@ -342,22 +342,22 @@ function CandidateCard({
       draggable
       onDragStart={() => onDragStart(candidate)}
       className={`
-        cursor-move hover:shadow-md transition-all
+        cursor-move hover:shadow-md transition-all touch-manipulation
         ${isDragging ? 'opacity-50' : ''}
       `}
     >
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Avatar className="h-10 w-10 flex-shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <Avatar className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0">
               <AvatarImage src={candidate.profile_photo_url || undefined} />
               <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                 {getInitials(candidate.teacher_name || 'T')}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-sm truncate">{candidate.teacher_name}</h4>
+              <h4 className="font-semibold text-xs sm:text-sm truncate">{candidate.teacher_name}</h4>
               <p className="text-xs text-muted-foreground truncate">
                 {candidate.teacher_archetype || 'No archetype'}
               </p>
@@ -365,8 +365,8 @@ function CandidateCard({
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6">
-                <MoreVertical className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0 touch-manipulation">
+                <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -420,12 +420,12 @@ function CandidateCard({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>{formatDistanceToNow(new Date(candidate.created_at), { addSuffix: true })}</span>
+        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 sm:pt-2 border-t">
+          <div className="flex items-center gap-1 min-w-0">
+            <Clock className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{formatDistanceToNow(new Date(candidate.created_at), { addSuffix: true })}</span>
           </div>
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          <GripVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
         </div>
       </CardContent>
     </Card>

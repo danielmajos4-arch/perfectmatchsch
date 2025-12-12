@@ -1,50 +1,47 @@
 // Supabase Storage service for file uploads
 import { supabase } from './supabaseClient';
+import {
+  validateFile,
+  generateUniqueFilename,
+  FILE_CONFIGS,
+  validateImageDimensions,
+} from './fileValidation';
 
 const PROFILE_IMAGES_BUCKET = 'profile-images';
 const DOCUMENTS_BUCKET = 'documents';
+const SCHOOL_LOGOS_BUCKET = 'school-logos';
 
-/**
- * Upload profile image
- */
 export async function uploadProfileImage(
   userId: string,
   file: File
 ): Promise<{ url: string; error: null } | { url: null; error: string }> {
   try {
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      return { url: null, error: 'Invalid file type. Please upload a JPEG, PNG, or WebP image.' };
+    const validation = validateFile(file, FILE_CONFIGS.profileImage);
+    if (!validation.valid) {
+      return { url: null, error: validation.error || 'Invalid file' };
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      return { url: null, error: 'File size too large. Maximum size is 5MB.' };
+    const dimensionValidation = await validateImageDimensions(file);
+    if (!dimensionValidation.valid) {
+      return { url: null, error: dimensionValidation.error || 'Invalid image dimensions' };
     }
 
-    // Create file path: user-id/timestamp-filename
-    const timestamp = Date.now();
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${userId}/${timestamp}.${fileExt}`;
+    const filename = generateUniqueFilename(file.name, userId);
 
-    // Upload file
     const { data, error } = await supabase.storage
       .from(PROFILE_IMAGES_BUCKET)
-      .upload(filePath, file, {
+      .upload(filename, file, {
         cacheControl: '3600',
-        upsert: true,
+        upsert: false,
       });
 
     if (error) {
       return { url: null, error: error.message };
     }
 
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from(PROFILE_IMAGES_BUCKET)
-      .getPublicUrl(filePath);
+      .getPublicUrl(data.path);
 
     return { url: urlData.publicUrl, error: null };
   } catch (error: any) {
@@ -52,57 +49,86 @@ export async function uploadProfileImage(
   }
 }
 
-/**
- * Upload document (resume, portfolio, etc.)
- */
 export async function uploadDocument(
   userId: string,
   file: File,
   documentType: 'resume' | 'portfolio' | 'other' = 'other'
 ): Promise<{ url: string; error: null } | { url: null; error: string }> {
   try {
-    // Validate file type
-    const validTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-    ];
-    if (!validTypes.includes(file.type)) {
-      return { url: null, error: 'Invalid file type. Please upload a PDF, DOC, DOCX, or TXT file.' };
+    const config =
+      documentType === 'resume'
+        ? FILE_CONFIGS.resume
+        : documentType === 'portfolio'
+          ? FILE_CONFIGS.portfolio
+          : FILE_CONFIGS.portfolio;
+
+    const validation = validateFile(file, config);
+    if (!validation.valid) {
+      return { url: null, error: validation.error || 'Invalid file' };
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      return { url: null, error: 'File size too large. Maximum size is 10MB.' };
-    }
+    const filename = generateUniqueFilename(file.name, userId);
 
-    // Create file path: user-id/document-type-timestamp.ext (bucket name is already specified in .from())
-    const timestamp = Date.now();
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${userId}/${documentType}-${timestamp}.${fileExt}`;
-
-    // Upload file
     const { data, error } = await supabase.storage
       .from(DOCUMENTS_BUCKET)
-      .upload(filePath, file, {
+      .upload(filename, file, {
         cacheControl: '3600',
-        upsert: true,
+        upsert: false,
       });
 
     if (error) {
       return { url: null, error: error.message };
     }
 
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from(DOCUMENTS_BUCKET)
-      .getPublicUrl(filePath);
+      .getPublicUrl(data.path);
 
     return { url: urlData.publicUrl, error: null };
   } catch (error: any) {
     return { url: null, error: error.message || 'Failed to upload document' };
+  }
+}
+
+export async function uploadResume(userId: string, file: File) {
+  return uploadDocument(userId, file, 'resume');
+}
+
+export async function uploadSchoolLogo(
+  schoolId: string,
+  file: File
+): Promise<{ url: string; error: null } | { url: null; error: string }> {
+  try {
+    const validation = validateFile(file, FILE_CONFIGS.schoolLogo);
+    if (!validation.valid) {
+      return { url: null, error: validation.error || 'Invalid file' };
+    }
+
+    const dimensionValidation = await validateImageDimensions(file, 100, 100, 1000, 1000);
+    if (!dimensionValidation.valid) {
+      return { url: null, error: dimensionValidation.error || 'Invalid image dimensions' };
+    }
+
+    const filename = generateUniqueFilename(file.name, schoolId);
+
+    const { data, error } = await supabase.storage
+      .from(SCHOOL_LOGOS_BUCKET)
+      .upload(filename, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      return { url: null, error: error.message };
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(SCHOOL_LOGOS_BUCKET)
+      .getPublicUrl(data.path);
+
+    return { url: urlData.publicUrl, error: null };
+  } catch (error: any) {
+    return { url: null, error: error.message || 'Failed to upload school logo' };
   }
 }
 

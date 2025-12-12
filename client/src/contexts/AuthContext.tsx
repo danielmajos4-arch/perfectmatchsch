@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient';
+import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 
 // Timeout duration for auth initialization (prevents infinite loading in PWA offline mode)
 const AUTH_TIMEOUT_MS = 5000;
@@ -47,10 +48,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const initCompleted = useRef(false);
   const isInitializing = useRef(false);
+  // Cache role lookups to avoid repeated database queries
+  const roleCache = useRef<Map<string, UserRole | null>>(new Map());
+  const { resetTimer } = useSessionTimeout();
 
   // Fetch role from public.users table, create record if missing
   const fetchOrCreateUserRole = async (currentUser: User): Promise<UserRole | null> => {
     const userId = currentUser.id;
+
+    // Check cache first
+    if (roleCache.current.has(userId)) {
+      return roleCache.current.get(userId) || null;
+    }
 
     try {
       // First, try to fetch from users table
@@ -66,8 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return metadataRole;
       }
 
-      // If we found a role in the database, return it
+      // If we found a role in the database, cache and return it
       if (data?.role && isValidRole(data.role)) {
+        roleCache.current.set(userId, data.role);
         return data.role;
       }
 
@@ -76,13 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (metadataRole) {
         // User record will be created during onboarding
+        roleCache.current.set(userId, metadataRole);
         return metadataRole;
       }
 
+      roleCache.current.set(userId, null);
       return null;
     } catch (err) {
       // Last resort: try to get role from metadata even if DB operation failed
       const fallbackRole = getRoleFromMetadata(currentUser);
+      roleCache.current.set(userId, fallbackRole);
       return fallbackRole;
     }
   };
@@ -173,6 +186,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      resetTimer();
+    }
+  }, [user, resetTimer]);
 
   return (
     <AuthContext.Provider value={{ user, session, loading, role, refreshRole }}>

@@ -12,6 +12,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, InfoIcon } from 'lucide-react';
 import { withTimeout, getAuthErrorMessage } from '@/lib/authUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
+import { validatePasswordStrength } from '@/lib/passwordValidation';
 
 // Email domain validation
 const BLOCKED_DOMAINS = [
@@ -110,10 +112,11 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (formData.password.length < 6) {
+    const passwordStrength = validatePasswordStrength(formData.password);
+    if (!passwordStrength.meetsMinimum) {
       toast({
         title: 'Invalid password',
-        description: 'Password must be at least 6 characters long.',
+        description: 'Please choose a stronger password.',
         variant: 'destructive',
       });
       return;
@@ -304,15 +307,15 @@ export default function Register() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a strong password (min. 6 characters)"
+                  placeholder="Create a strong password (min. 8 characters, mixed case, number, symbol)"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   required
-                  minLength={6}
                   className="h-12 text-base"
                   data-testid="input-password"
                   autoComplete="new-password"
                 />
+                <PasswordStrengthIndicator password={formData.password} />
               </div>
 
               {/* Role Field */}

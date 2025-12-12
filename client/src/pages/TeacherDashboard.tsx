@@ -406,16 +406,16 @@ export default function TeacherDashboard() {
       />
       
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-        <div className="px-4 md:px-8 py-8 md:py-12 max-w-7xl mx-auto">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 max-w-7xl mx-auto">
           {/* Header Section with Profile */}
-          <div className="mb-10">
-            <Card className="p-4 sm:p-6 md:p-8 bg-gradient-to-br from-card via-card to-primary/5 border-primary/10 shadow-lg">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+          <div className="mb-6 sm:mb-8 md:mb-10">
+            <Card className="p-3 sm:p-4 md:p-6 lg:p-8 bg-gradient-to-br from-card via-card to-primary/5 border-primary/10 shadow-lg">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 md:gap-6">
                 <Link href="/profile" className="group flex-shrink-0">
                   <div className="relative">
-                    <Avatar className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 cursor-pointer group-hover:scale-105 transition-all duration-300 border-4 border-primary/30 shadow-xl ring-4 ring-primary/10">
+                    <Avatar className="h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 lg:h-24 lg:w-24 cursor-pointer group-hover:scale-105 transition-all duration-300 border-2 sm:border-4 border-primary/30 shadow-xl ring-2 sm:ring-4 ring-primary/10">
                       <AvatarImage src={teacherProfile?.profile_photo_url || undefined} alt={teacherProfile?.full_name || user?.user_metadata?.full_name || 'Teacher'} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-2xl">
+                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary font-bold text-lg sm:text-xl md:text-2xl">
                         {(teacherProfile?.full_name || user?.user_metadata?.full_name || 'Teacher')
                           .split(' ')
                           .map(n => n[0])
@@ -424,40 +424,40 @@ export default function TeacherDashboard() {
                           .slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="absolute -bottom-1 -right-1 h-6 w-6 bg-green-500 rounded-full border-2 border-background shadow-md"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 bg-green-500 rounded-full border-2 border-background shadow-md"></div>
                   </div>
                 </Link>
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent">
+                <div className="flex-1 min-w-0 space-y-1.5 sm:space-y-2">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold bg-gradient-to-r from-[#00BCD4] via-[#E91E8C] to-[#FF6B35] bg-clip-text text-transparent break-words">
                       Welcome back, {user?.user_metadata?.full_name?.split(' ')[0] || 'Teacher'}
                     </h1>
                     {teacherProfile?.archetype && (
-                      <Badge className="bg-gradient-to-r from-primary/20 to-primary/10 text-primary border-primary/30 px-3 py-1 text-xs md:text-sm">
+                      <Badge className="bg-gradient-to-r from-primary/20 to-primary/10 text-primary border-primary/30 px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-sm flex-shrink-0">
                         {teacherProfile.archetype}
                       </Badge>
                     )}
                   </div>
-                  <p className="text-muted-foreground text-sm sm:text-base md:text-lg">Track your applications and discover new opportunities</p>
+                  <p className="text-muted-foreground text-xs sm:text-sm md:text-base lg:text-lg">Track your applications and discover new opportunities</p>
                   {/* Achievement Badges - Compact View */}
                   {achievements.length > 0 && user?.id && (
-                    <div className="flex items-center gap-2 flex-wrap pt-2">
+                    <div className="flex items-center gap-2 flex-wrap pt-1 sm:pt-2">
                       <span className="text-xs text-muted-foreground">Achievements:</span>
                       <AchievementCollection userId={user.id} compact={true} />
                     </div>
                   )}
                   {teacherProfile && (
-                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 pt-2 text-xs sm:text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Briefcase className="h-4 w-4 flex-shrink-0" />
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4 pt-1 sm:pt-2 text-xs sm:text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                         <span>{teacherProfile.subjects?.length || 0} Subjects</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Award className="h-4 w-4 flex-shrink-0" />
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                         <span>{teacherProfile.years_experience || 'N/A'} Experience</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <User className="h-4 w-4 flex-shrink-0" />
+                      <div className="flex items-center gap-1 sm:gap-1.5">
+                        <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                         <span className="truncate">{teacherProfile.location || 'Location not set'}</span>
                       </div>
                     </div>
@@ -468,7 +468,7 @@ export default function TeacherDashboard() {
           </div>
 
           {/* Quick Stats & Widgets Grid - Mobile First */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 md:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mb-4 sm:mb-6 md:mb-8">
             {/* Profile Completion - Left Column */}
             {teacherProfile && (
               <div className="lg:col-span-1">
@@ -484,20 +484,20 @@ export default function TeacherDashboard() {
             {/* Achievements Stats Card */}
             {achievements.length > 0 && user?.id && (
               <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20 border-yellow-200 dark:border-yellow-800">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2 sm:pb-3 p-4 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Award className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    <CardTitle className="text-base sm:text-lg flex items-center gap-1.5 sm:gap-2">
+                      <Award className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 dark:text-yellow-400" />
                       Achievements
                     </CardTitle>
-                    <Badge variant="secondary" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                    <Badge variant="secondary" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 text-xs">
                       {achievements.length}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-3">
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                       {achievements.slice(0, 6).map((achievement) => (
                         <AchievementBadge
                           key={achievement.id}
@@ -508,7 +508,7 @@ export default function TeacherDashboard() {
                       ))}
                       {achievements.length > 6 && (
                         <Link href="/profile#achievements">
-                          <Badge variant="outline" className="h-8 px-3 cursor-pointer hover:bg-primary/10">
+                          <Badge variant="outline" className="h-7 sm:h-8 px-2 sm:px-3 cursor-pointer hover:bg-primary/10 text-xs">
                             +{achievements.length - 6} more
                           </Badge>
                         </Link>
@@ -516,7 +516,7 @@ export default function TeacherDashboard() {
                     </div>
                     {stats && (
                       <div className="pt-2 border-t border-yellow-200 dark:border-yellow-800">
-                        <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center justify-between text-xs sm:text-sm">
                           <span className="text-muted-foreground">Total Points</span>
                           <span className="font-semibold text-yellow-700 dark:text-yellow-300">
                             {stats.totalPoints || 0}
@@ -525,7 +525,7 @@ export default function TeacherDashboard() {
                       </div>
                     )}
                     <Link href="/profile#achievements">
-                      <Button variant="outline" size="sm" className="w-full mt-2">
+                      <Button variant="outline" size="sm" className="w-full mt-2 text-xs sm:text-sm h-8 sm:h-9">
                         View All Achievements
                       </Button>
                     </Link>
@@ -537,7 +537,7 @@ export default function TeacherDashboard() {
             {/* Archetype Badge - Middle Column */}
             {teacherProfile?.archetype && (
               <div className="lg:col-span-1">
-                <Card className="p-6 h-full bg-gradient-to-br from-card to-accent/5 border-accent/10 shadow-md hover:shadow-lg transition-shadow">
+                <Card className="p-4 sm:p-5 md:p-6 h-full bg-gradient-to-br from-card to-accent/5 border-accent/10 shadow-md hover:shadow-lg transition-shadow">
                   <ArchetypeBadge teacher={teacherProfile} showAnimation={true} />
                 </Card>
               </div>
@@ -546,7 +546,7 @@ export default function TeacherDashboard() {
             {/* Next Steps - Right Column */}
             {teacherProfile && (
               <div className="lg:col-span-1">
-                <Card className="p-6 h-full bg-gradient-to-br from-card to-secondary/5 border-secondary/10 shadow-md hover:shadow-lg transition-shadow">
+                <Card className="p-4 sm:p-5 md:p-6 h-full bg-gradient-to-br from-card to-secondary/5 border-secondary/10 shadow-md hover:shadow-lg transition-shadow">
                   <NextStepsWidget
                     teacher={teacherProfile}
                     matchedJobsCount={matchedJobs?.length || 0}
@@ -573,18 +573,18 @@ export default function TeacherDashboard() {
           )}
 
           {/* Main Content Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
             {/* Left Column - Applications Timeline */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6">
               {/* Application Status Timeline */}
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-1">Application Status</h2>
-                    <p className="text-sm text-muted-foreground">Track all your job applications</p>
+              <Card className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3 xs:gap-4 mb-4 sm:mb-6">
+                  <div className="min-w-0">
+                    <h2 className="text-xl sm:text-2xl font-bold mb-1 break-words">Application Status</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Track all your job applications</p>
                   </div>
-                  <Link href="/teacher/applications">
-                    <Button variant="outline" size="sm">
+                  <Link href="/teacher/applications" className="w-full xs:w-auto">
+                    <Button variant="outline" size="sm" className="w-full xs:w-auto text-xs sm:text-sm h-9 sm:h-10">
                       View All
                     </Button>
                   </Link>
@@ -644,40 +644,45 @@ export default function TeacherDashboard() {
           </div>
 
           {/* Tabs for Applications and Matched Jobs */}
-          <Card className="p-6 md:p-8 bg-card border-border shadow-md">
+          <Card className="p-4 sm:p-5 md:p-6 lg:p-8 bg-card border-border shadow-md">
             <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6 md:mb-8 bg-muted/50 p-1 sm:p-1.5 rounded-lg">
-                <TabsTrigger 
-                  value="applications" 
-                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Applications
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="matches"
-                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium"
-                >
-                  <Star className="h-4 w-4 mr-2" />
-                  Matched Jobs
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="favorites"
-                  className="data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium"
-                >
-                  <Heart className="h-4 w-4 mr-2" />
-                  Favorites
-                </TabsTrigger>
-              </TabsList>
+              <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                <TabsList className="grid w-full min-w-[280px] grid-cols-3 mb-4 sm:mb-6 md:mb-8 bg-muted/50 p-1 sm:p-1.5 rounded-lg">
+                  <TabsTrigger 
+                    value="applications" 
+                    className="data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-4"
+                  >
+                    <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden xs:inline">Applications</span>
+                    <span className="xs:hidden">Apps</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="matches"
+                    className="data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-4"
+                  >
+                    <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden xs:inline">Matched Jobs</span>
+                    <span className="xs:hidden">Matches</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="favorites"
+                    className="data-[state=active]:bg-background data-[state=active]:shadow-sm font-medium text-xs sm:text-sm h-9 sm:h-10 px-2 sm:px-4"
+                  >
+                    <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden xs:inline">Favorites</span>
+                    <span className="xs:hidden">Saved</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
 
               <TabsContent value="applications" className="space-y-4 mt-0">
-                <div id="applications" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-border">
-                  <div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-1">Your Applications</h2>
-                    <p className="text-sm text-muted-foreground">Track the status of your job applications</p>
+                <div id="applications" className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
+                  <div className="min-w-0">
+                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 break-words">Your Applications</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Track the status of your job applications</p>
                   </div>
                   <Link href="/jobs" className="w-full sm:w-auto">
-                    <Button variant="outline" className="gap-2 w-full sm:w-auto h-11" data-testid="link-browse-jobs">
+                    <Button variant="outline" className="gap-2 w-full sm:w-auto h-10 sm:h-11 text-sm sm:text-base" data-testid="link-browse-jobs">
                       <Briefcase className="h-4 w-4" />
                       Browse Jobs
                     </Button>
@@ -714,9 +719,9 @@ export default function TeacherDashboard() {
 
               {/* Matched Jobs Tab */}
               <TabsContent value="matches" className="space-y-4 mt-0">
-                <div id="matches" className="mb-6 pb-4 border-b border-border">
-                  <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Matched Jobs</h2>
-                  <p className="text-sm text-muted-foreground">Jobs matched to your teaching archetype and preferences</p>
+                <div id="matches" className="mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2 break-words">Matched Jobs</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Jobs matched to your teaching archetype and preferences</p>
                 </div>
 
             {matchesLoading ? (
@@ -735,22 +740,24 @@ export default function TeacherDashboard() {
                       matchScore={match.match_score}
                     />
                     {/* Action Buttons - Mobile Optimized */}
-                    <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex gap-2">
+                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 flex gap-1.5 sm:gap-2">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => favoriteMutation.mutate({ matchId: match.id, isFavorited: !match.is_favorited })}
-                        className="h-10 w-10 sm:h-8 sm:w-8"
+                        className="h-9 w-9 sm:h-8 sm:w-8 touch-manipulation"
+                        aria-label={match.is_favorited ? "Remove from favorites" : "Add to favorites"}
                       >
-                        <Heart className={`h-5 w-5 sm:h-4 sm:w-4 ${match.is_favorited ? 'fill-primary text-primary' : ''}`} />
+                        <Heart className={`h-4 w-4 sm:h-4 sm:w-4 ${match.is_favorited ? 'fill-primary text-primary' : ''}`} />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => hideMutation.mutate({ matchId: match.id })}
-                        className="h-10 w-10 sm:h-8 sm:w-8"
+                        className="h-9 w-9 sm:h-8 sm:w-8 touch-manipulation"
+                        aria-label="Hide job"
                       >
-                        <X className="h-5 w-5 sm:h-4 sm:w-4" />
+                        <X className="h-4 w-4 sm:h-4 sm:w-4" />
                       </Button>
                     </div>
                     {match.match_reason && (
@@ -776,9 +783,9 @@ export default function TeacherDashboard() {
 
           {/* Favorites Tab */}
               <TabsContent value="favorites" className="space-y-4 mt-0">
-                <div id="favorites" className="mb-6 pb-4 border-b border-border">
-                  <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Favorited Jobs</h2>
-                  <p className="text-sm text-muted-foreground">Jobs you've saved for later</p>
+                <div id="favorites" className="mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-border">
+                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2 break-words">Favorited Jobs</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Jobs you've saved for later</p>
                 </div>
 
             {favoritedLoading ? (
@@ -788,16 +795,16 @@ export default function TeacherDashboard() {
                 ))}
               </div>
             ) : favoritedJobs && favoritedJobs.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {favoritedJobs.map((match) => (
-                  <Card key={match.id} className="p-4 hover-elevate">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
+                  <Card key={match.id} className="p-3 sm:p-4 hover-elevate">
+                    <div className="flex items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 min-w-0">
                         <Link href={`/jobs/${match.job.id}`}>
                           <a className="block">
-                            <h3 className="text-lg font-semibold text-primary hover:underline mb-1">{match.job.title}</h3>
-                            <p className="text-sm text-muted-foreground mb-2">{match.job.school_name}</p>
-                            <div className="flex flex-wrap gap-2">
+                            <h3 className="text-base sm:text-lg font-semibold text-primary hover:underline mb-1 break-words">{match.job.title}</h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-2 truncate">{match.job.school_name}</p>
+                            <div className="flex flex-wrap gap-1.5 sm:gap-2">
                               <Badge variant="secondary" className="rounded-full text-xs">
                                 {match.job.subject}
                               </Badge>
@@ -812,6 +819,8 @@ export default function TeacherDashboard() {
                         variant="ghost"
                         size="icon"
                         onClick={() => favoriteMutation.mutate({ matchId: match.id, isFavorited: false })}
+                        className="h-9 w-9 sm:h-8 sm:w-8 flex-shrink-0 touch-manipulation"
+                        aria-label="Remove from favorites"
                       >
                         <Heart className="h-4 w-4 fill-red-500 text-red-500" />
                       </Button>

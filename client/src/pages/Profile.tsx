@@ -24,14 +24,10 @@ export default function Profile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const { data: user } = useQuery({
-    queryKey: ['/api/auth/user'],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      return data.user;
-    },
-  });
-
+  const { user } = useAuth(); // Use auth context instead of separate query
+  
+  // Get profile data from AuthenticatedLayout's queries via shared query cache
+  // This avoids duplicate queries since AuthenticatedLayout already fetches these
   const { data: teacherProfile } = useTeacherProfile(user?.id);
   const { data: schoolProfile } = useSchoolProfile(user?.id);
 
@@ -167,35 +163,43 @@ export default function Profile() {
               )}
 
               {/* Teacher Profile Editor */}
-              {isTeacher && teacherProfile && user?.id && (
+              {isTeacher && user?.id && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <TeacherProfileEditor teacher={teacherProfile} userId={user.id} />
+                  {teacherProfile ? (
+                    <>
+                      <TeacherProfileEditor teacher={teacherProfile} userId={user.id} />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <ResumeUpload
-                      teacher={teacherProfile}
-                      userId={user.id}
-                      onUpdate={() => {
-                        queryClient.invalidateQueries({ queryKey: ['/api/teacher-profile', user.id] });
-                      }}
-                    />
-                    <PortfolioUpload
-                      teacher={teacherProfile}
-                      userId={user.id}
-                      onUpdate={() => {
-                        queryClient.invalidateQueries({ queryKey: ['/api/teacher-profile', user.id] });
-                      }}
-                    />
-                  </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ResumeUpload
+                          teacher={teacherProfile}
+                          userId={user.id}
+                          onUpdate={() => {
+                            queryClient.invalidateQueries({ queryKey: ['/api/teacher-profile', user.id] });
+                          }}
+                        />
+                        <PortfolioUpload
+                          teacher={teacherProfile}
+                          userId={user.id}
+                          onUpdate={() => {
+                            queryClient.invalidateQueries({ queryKey: ['/api/teacher-profile', user.id] });
+                          }}
+                        />
+                      </div>
 
-                  {/* Achievements */}
-                  <div id="achievements">
-                    <AchievementCollection userId={user.id} showProgress={true} />
-                  </div>
+                      {/* Achievements - Render immediately, loads async */}
+                      <div id="achievements">
+                        <AchievementCollection userId={user.id} showProgress={true} />
+                      </div>
 
-                  {/* Archetype Resources */}
-                  {teacherProfile.archetype && (
-                    <ArchetypeGrowthResources teacher={teacherProfile} />
+                      {/* Archetype Resources - Only render if archetype exists */}
+                      {teacherProfile.archetype && (
+                        <ArchetypeGrowthResources teacher={teacherProfile} />
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center py-12">
+                      <p className="text-muted-foreground">Loading profile...</p>
+                    </div>
                   )}
                 </div>
               )}

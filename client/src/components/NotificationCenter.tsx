@@ -37,18 +37,19 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Fetch notifications
+  // Fetch notifications - only when popover is open to reduce initial load
   const { data: notifications = [], isLoading } = useQuery<InAppNotification[]>({
     queryKey: ['notifications', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       return await getUserNotifications(user.id, { limit: 50 });
     },
-    enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    enabled: !!user?.id && isOpen, // Only fetch when popover is open
+    staleTime: 1000 * 30, // 30 seconds
+    gcTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  // Fetch unread count
+  // Fetch unread count - lightweight, can load immediately
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notification-count', user?.id],
     queryFn: async () => {
@@ -56,10 +57,12 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
       return await getUnreadCount(user.id);
     },
     enabled: !!user?.id,
-    refetchInterval: 10000, // Refetch every 10 seconds
+    staleTime: 1000 * 30, // 30 seconds
+    gcTime: 1000 * 60 * 5, // 5 minutes
+    refetchInterval: 60000, // Refetch every 60 seconds (reduced from 10s)
   });
 
-  // Real-time subscription
+  // Real-time subscription - only for unread count updates (lightweight)
   useEffect(() => {
     if (!user?.id) return;
 
@@ -74,8 +77,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
-          // Refetch notifications when new one is created
-          queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+          // Only invalidate count (lightweight) - full list will load when opened
           queryClient.invalidateQueries({ queryKey: ['notification-count', user.id] });
         }
       )
@@ -88,8 +90,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
           filter: `user_id=eq.${user.id}`,
         },
         () => {
-          // Refetch when notification is marked as read
-          queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+          // Only invalidate count
           queryClient.invalidateQueries({ queryKey: ['notification-count', user.id] });
         }
       )

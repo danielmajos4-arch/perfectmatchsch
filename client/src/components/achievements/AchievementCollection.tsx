@@ -29,12 +29,14 @@ export function AchievementCollection({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   useEffect(() => {
+    // Load achievements asynchronously without blocking
     loadAchievements();
   }, [userId]);
 
   async function loadAchievements() {
     setLoading(true);
     try {
+      // These functions now return immediately (disabled), so this should be fast
       const [unlocked, all] = await Promise.all([
         getUserAchievements(userId),
         getAllAchievements(),
@@ -43,6 +45,9 @@ export function AchievementCollection({
       setAllAchievements(all);
     } catch (error) {
       console.error('Error loading achievements:', error);
+      // Set empty arrays on error to prevent blocking
+      setUnlockedAchievements([]);
+      setAllAchievements([]);
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { withTimeout, getAuthErrorMessage } from '@/lib/authUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLoginRateLimiter } from '@/hooks/useLoginRateLimiter';
+import { AlertTriangle } from 'lucide-react';
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -17,6 +19,12 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const {
+    isLocked,
+    recordAttempt,
+    formatRemainingTime,
+    attemptsRemaining,
+  } = useLoginRateLimiter();
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
@@ -33,6 +41,14 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) {
+      toast({
+        title: 'Too many attempts',
+        description: `Try again in ${formatRemainingTime()}`,
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -47,6 +63,7 @@ export default function Login() {
       );
 
       if (error) {
+        recordAttempt(email, false);
         // Check if it's an email not confirmed error
         if (error.message.includes('not confirmed') || error.message.includes('Email not confirmed')) {
           // Redirect to verification page
@@ -54,7 +71,11 @@ export default function Login() {
           setLocation('/verify-email');
           return;
         }
-        throw error;
+        const remainingMessage =
+          attemptsRemaining <= 2
+            ? `Invalid credentials. ${attemptsRemaining} attempt(s) remaining.`
+            : 'Invalid email or password';
+        throw new Error(remainingMessage);
       }
 
       // Login successful - check verification status
@@ -66,6 +87,7 @@ export default function Login() {
       }
 
       if (data.user) {
+        recordAttempt(email, true);
         toast({
           title: 'Welcome back!',
           description: 'You have successfully logged in.',
@@ -111,6 +133,17 @@ export default function Login() {
           </CardHeader>
 
           <CardContent className="p-0">
+            {isLocked && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2 text-red-800">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="font-medium">Account temporarily locked</span>
+                </div>
+                <p className="text-sm text-red-600 mt-1">
+                  Too many failed login attempts. Try again in {formatRemainingTime()}.
+                </p>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
