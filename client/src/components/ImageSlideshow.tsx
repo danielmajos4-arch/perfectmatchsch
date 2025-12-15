@@ -63,7 +63,7 @@ export const ImageSlideshow = memo(function ImageSlideshow({
               <img
                 src={image}
                 alt={`Slideshow image ${index + 1}`}
-                className="w-full h-full object-cover object-center"
+                className="w-full h-full object-cover object-[center_15%]"
                 loading={index === 0 ? "eager" : "lazy"}
                 decoding="async"
                 fetchPriority={index === 0 ? "high" : "low"}
