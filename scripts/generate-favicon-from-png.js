@@ -11,14 +11,15 @@
  */
 
 import sharp from 'sharp';
-import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import toIco from 'to-ico';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const iconSizes = [16, 32, 72, 96, 144, 152, 180, 192, 512];
+const iconSizes = [16, 32, 48, 72, 96, 144, 152, 180, 192, 512];
 const sourceImagePath = join(__dirname, '../client/public/new-logo-source.png');
 const outputDir = join(__dirname, '../client/public/icons');
 const publicDir = join(__dirname, '../client/public');
@@ -44,14 +45,16 @@ async function generateIcons() {
       const outputPath = join(outputDir, `icon-${size}x${size}.png`);
       
       // Make icons bolder by using 90% of canvas size (less padding)
-      const logoSize = Math.floor(size * 0.9);
+      // Use 95% for favicon sizes (16, 32) to make them extra bold
+      const isFaviconSize = size === 16 || size === 32;
+      const logoSize = Math.floor(size * (isFaviconSize ? 0.95 : 0.9));
       
       await sharp(sourceImagePath)
         .resize(logoSize, logoSize, {
           fit: 'contain',
           background: { r: 255, g: 255, b: 255, alpha: 0 }
         })
-        .sharpen() // Add sharpening for better visibility
+        .sharpen(isFaviconSize ? { sigma: 1.5 } : undefined) // Extra sharpening for small favicon sizes
         .extend({
           top: Math.floor((size - logoSize) / 2),
           bottom: Math.ceil((size - logoSize) / 2),
@@ -109,57 +112,40 @@ async function generateIcons() {
       .toFile(faviconPngPath);
     console.log(`✅ Generated: favicon.png (32x32)`);
 
-      // Generate favicon.ico using the 32x32 and 16x16 versions
-      // Note: We'll create a simple ICO file using sharp's ability to create multi-resolution ICO
-      try {
-        // Make 16x16 extra bold (95% of canvas)
-        const icon16Size = 16;
-        const icon16LogoSize = Math.floor(icon16Size * 0.95);
-        const icon16 = await sharp(sourceImagePath)
-          .resize(icon16LogoSize, icon16LogoSize, {
-            fit: 'contain',
-            background: { r: 255, g: 255, b: 255, alpha: 0 }
-          })
-          .sharpen({ sigma: 1.5 })
-          .extend({
-            top: Math.floor((icon16Size - icon16LogoSize) / 2),
-            bottom: Math.ceil((icon16Size - icon16LogoSize) / 2),
-            left: Math.floor((icon16Size - icon16LogoSize) / 2),
-            right: Math.ceil((icon16Size - icon16LogoSize) / 2),
-            background: { r: 255, g: 255, b: 255, alpha: 0 }
-          })
-          .png()
-          .toBuffer();
+    // Generate favicon.ico using proper ICO format
+    // Read the generated PNG files and convert to ICO using to-ico
+    try {
+      const icoSizes = [16, 32, 48];
+      const icoBuffers = [];
 
-        // Make 32x32 extra bold (95% of canvas)
-        const icon32Size = 32;
-        const icon32LogoSize = Math.floor(icon32Size * 0.95);
-        const icon32 = await sharp(sourceImagePath)
-          .resize(icon32LogoSize, icon32LogoSize, {
-            fit: 'contain',
-            background: { r: 255, g: 255, b: 255, alpha: 0 }
-          })
-          .sharpen({ sigma: 1.5 })
-          .extend({
-            top: Math.floor((icon32Size - icon32LogoSize) / 2),
-            bottom: Math.ceil((icon32Size - icon32LogoSize) / 2),
-            left: Math.floor((icon32Size - icon32LogoSize) / 2),
-            right: Math.ceil((icon32Size - icon32LogoSize) / 2),
-            background: { r: 255, g: 255, b: 255, alpha: 0 }
-          })
-          .png()
-          .toBuffer();
+      for (const size of icoSizes) {
+        const iconPath = join(outputDir, `icon-${size}x${size}.png`);
+        if (existsSync(iconPath)) {
+          const buffer = readFileSync(iconPath);
+          icoBuffers.push(buffer);
+          console.log(`✅ Read icon-${size}x${size}.png for ICO generation`);
+        } else {
+          console.warn(`⚠️  Warning: icon-${size}x${size}.png not found, skipping for ICO`);
+        }
+      }
 
-      // For ICO generation, we'll use a workaround: create a 32x32 PNG and rename it
-      // Most modern browsers accept PNG as favicon.ico
+      if (icoBuffers.length === 0) {
+        throw new Error('No icon files found to create favicon.ico');
+      }
+
+      // Convert PNG buffers to proper ICO format
+      const ico = await toIco(icoBuffers);
+      
+      // Write favicon.ico
       const faviconIcoPath = join(publicDir, 'favicon.ico');
-      await sharp(icon32)
-        .png()
-        .toFile(faviconIcoPath);
-      console.log(`✅ Generated: favicon.ico (using 32x32 PNG)`);
+      writeFileSync(faviconIcoPath, ico);
+      console.log(`✅ Generated: favicon.ico (proper ICO format with ${icoBuffers.length} sizes)`);
     } catch (icoError) {
       console.warn(`⚠️  Could not generate favicon.ico: ${icoError.message}`);
-      console.log('   You may need to convert icon-32x32.png to .ico manually');
+      if (icoError.message.includes('to-ico')) {
+        console.warn('   Install to-ico: npm install to-ico --save-dev');
+      }
+      console.log('   You can run "node scripts/generate-favicon.js" separately to generate favicon.ico');
     }
 
     console.log('\n✨ All icons generated successfully!');
