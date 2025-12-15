@@ -182,4 +182,3 @@ async function generateIcons() {
 }
 
 generateIcons();
-
