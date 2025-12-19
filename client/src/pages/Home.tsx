@@ -1,24 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Layout } from '@/components/Layout';
-import { Briefcase, MessageCircle, Search, GraduationCap } from 'lucide-react';
+import { Briefcase, MessageCircle, Search } from 'lucide-react';
 import { HeroSearch } from '@/components/HeroSearch';
 import { TrustBadges } from '@/components/TrustBadges';
-import { ImageSlideshow } from '@/components/ImageSlideshow';
 // Images moved to public folder for Vercel deployment
-const logoUrl = '/images/logo.png';
 const featuresImageUrl = '/images/features.png';
-const heroBackgroundImage = '/images/hero-background.png';
-const slideshowImages = [
-  '/images/slideshow-1.png',
-  '/images/slideshow-2.png',
-  '/images/slideshow-3.png',
-];
+// Hero video - continuously playing background video (like Fiverr)
+const heroVideoUrl = '/videos/hero-video.mp4';
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Secret admin access: Shift + Cmd/Ctrl + A
   useEffect(() => {
@@ -34,20 +29,46 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [setLocation]);
 
+  // Handle video loading and autoplay
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleCanPlay = () => {
+      // Video loaded successfully, ensure it plays
+      video.play().catch((err) => {
+        console.warn('Video autoplay prevented:', err);
+      });
+    };
+
+    video.addEventListener('canplay', handleCanPlay);
+
+    return () => {
+      video.removeEventListener('canplay', handleCanPlay);
+    };
+  }, []);
+
   return (
     <Layout>
     <div className="min-h-screen bg-background dark:bg-background">
         {/* Hero Section - Mobile optimized */}
         <div className="px-3 py-3 sm:px-4 sm:py-4 md:px-6 md:py-6 lg:px-8 lg:py-8">
           <section className="relative min-h-[420px] xs:min-h-[480px] sm:min-h-[550px] md:min-h-[650px] lg:min-h-[750px] flex items-center overflow-hidden rounded-xl sm:rounded-2xl md:rounded-3xl shadow-2xl">
-            {/* Background Slideshow with Overlay */}
+            {/* Background Video with Overlay */}
             <div className="absolute inset-0 overflow-hidden rounded-xl sm:rounded-2xl md:rounded-3xl bg-background dark:bg-background">
-              <ImageSlideshow 
-                images={slideshowImages}
-                interval={6000}
-                transitionDuration={3000}
-                className="w-full h-full"
-              />
+              {/* Hero Video - Autoplay, Loop, Muted (like Fiverr) */}
+              <video
+                ref={videoRef}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+                preload="auto"
+                aria-label="Hero background video"
+              >
+                <source src={heroVideoUrl} type="video/mp4" />
+              </video>
               {/* Dark overlay for text readability */}
               <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/70 dark:from-black/50 dark:via-black/40 dark:to-black/50"></div>
         </div>
