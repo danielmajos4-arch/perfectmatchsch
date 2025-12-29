@@ -53,7 +53,7 @@ export default function TeacherDashboard() {
   });
 
   // Get teacher profile first (needed by other queries)
-  const { data: teacherProfile } = useQuery<Teacher>({
+  const { data: teacherProfile, error: teacherProfileError, isLoading: teacherProfileLoading } = useQuery<Teacher>({
     queryKey: ['/api/teacher-profile', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -66,15 +66,17 @@ export default function TeacherDashboard() {
       return data as Teacher;
     },
     enabled: !!user?.id,
+    retry: 2,
   });
 
-  const { data: applications, isLoading: applicationsLoading } = useQuery<ApplicationWithJob[]>({
+  const { data: applications, isLoading: applicationsLoading, error: applicationsError } = useQuery<ApplicationWithJob[]>({
     queryKey: ['/api/applications', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       return await getTeacherApplications(user.id);
     },
     enabled: !!user?.id,
+    retry: 2,
   });
 
   // Get application stats
@@ -144,7 +146,7 @@ export default function TeacherDashboard() {
   }, []);
 
   // Get matched jobs (Sprint 6) with real-time updates
-  const { data: matchedJobs, isLoading: matchesLoading } = useQuery<(TeacherJobMatch & { job: Job })[]>({
+  const { data: matchedJobs, isLoading: matchesLoading, error: matchesError } = useQuery<(TeacherJobMatch & { job: Job })[]>({
     queryKey: ['/api/job-matches', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -152,6 +154,7 @@ export default function TeacherDashboard() {
     },
     enabled: !!user?.id && !!teacherProfile?.archetype_tags,
     refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 2,
   });
 
   // Real-time subscription for new jobs
@@ -186,12 +189,23 @@ export default function TeacherDashboard() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] Subscribed to job matches');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Realtime] Error subscribing to job matches');
+          toast({
+            title: 'Connection issue',
+            description: 'Unable to receive real-time updates. Please refresh the page.',
+            variant: 'destructive',
+          });
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, teacherProfile?.archetype_tags]);
+  }, [user?.id, teacherProfile?.archetype_tags, queryClient, toast]);
 
   // Real-time subscription for application status updates
   useEffect(() => {
@@ -229,7 +243,13 @@ export default function TeacherDashboard() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] Subscribed to application updates');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Realtime] Error subscribing to application updates');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -254,7 +274,13 @@ export default function TeacherDashboard() {
           queryClient.invalidateQueries({ queryKey: ['/api/profile-views', teacherProfile.id] });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] Subscribed to profile views');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Realtime] Error subscribing to profile views');
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -395,6 +421,23 @@ export default function TeacherDashboard() {
     const config = variants[status] || variants.pending;
     return <Badge variant={config.variant} className="rounded-full">{config.label}</Badge>;
   };
+
+  // Show error states if critical queries fail
+  if (teacherProfileError) {
+    return (
+      <AuthenticatedLayout>
+        <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-8">
+          <Card className="p-8 text-center">
+            <h2 className="text-2xl font-bold mb-4">Unable to load profile</h2>
+            <p className="text-muted-foreground mb-4">
+              {teacherProfileError instanceof Error ? teacherProfileError.message : 'An error occurred while loading your profile.'}
+            </p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </Card>
+        </div>
+      </AuthenticatedLayout>
+    );
+  }
 
   const content = (
     <AuthenticatedLayout>
@@ -695,6 +738,16 @@ export default function TeacherDashboard() {
                   <div key={i} className="h-32 bg-card border border-card-border rounded-lg animate-pulse" />
                 ))}
               </div>
+            ) : applicationsError ? (
+              <EmptyState
+                icon="alert"
+                title="Error loading applications"
+                description={applicationsError instanceof Error ? applicationsError.message : 'Failed to load your applications. Please try again.'}
+                action={{
+                  label: "Retry",
+                  onClick: () => window.location.reload()
+                }}
+              />
             ) : applications && applications.length > 0 ? (
               <div className="space-y-4">
                 {applications.map((application) => (
@@ -730,6 +783,16 @@ export default function TeacherDashboard() {
                   <div key={i} className="h-32 bg-card border border-card-border rounded-lg animate-pulse" />
                 ))}
               </div>
+            ) : matchesError ? (
+              <EmptyState
+                icon="alert"
+                title="Error loading matches"
+                description={matchesError instanceof Error ? matchesError.message : 'Failed to load job matches. Please try again.'}
+                action={{
+                  label: "Retry",
+                  onClick: () => window.location.reload()
+                }}
+              />
             ) : matchedJobs && matchedJobs.length > 0 ? (
               <div className="space-y-4">
                 {matchedJobs.map((match) => (

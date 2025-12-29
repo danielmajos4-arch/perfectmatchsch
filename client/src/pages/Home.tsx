@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,6 +14,7 @@ const heroVideoUrl = '/videos/hero-video.mp4';
 export default function Home() {
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // Secret admin access: Shift + Cmd/Ctrl + A
   useEffect(() => {
@@ -41,10 +42,17 @@ export default function Home() {
       });
     };
 
+    const handlePlaying = () => {
+      // Video is now actually playing, show it
+      setIsVideoPlaying(true);
+    };
+
     video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('playing', handlePlaying);
 
     return () => {
       video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('playing', handlePlaying);
     };
   }, []);
 
@@ -63,7 +71,9 @@ export default function Home() {
                 loop
                 muted
                 playsInline
-                className="absolute inset-0 w-full h-full object-cover"
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  isVideoPlaying ? 'opacity-100' : 'opacity-0'
+                }`}
                 preload="auto"
                 aria-label="Hero background video"
               >
@@ -71,8 +81,8 @@ export default function Home() {
               </video>
               {/* Dark overlay for text readability */}
               <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-black/70 dark:from-black/50 dark:via-black/40 dark:to-black/50"></div>
-        </div>
-
+            </div>
+              
             {/* Content Container - Mobile first */}
             <div className="relative z-10 w-full max-w-7xl mx-auto px-3 xs:px-4 sm:px-6 md:px-8 py-6 sm:py-8 md:py-12 lg:py-16">
               <div className="max-w-5xl">
@@ -89,7 +99,7 @@ export default function Home() {
                       Perfect Match 
                     </span>
         </h1>
-                </div>
+        </div>
 
                 {/* Search Component - Responsive padding */}
                 <div className="bg-gray-900/95 dark:bg-gray-950/95 backdrop-blur-md border border-gray-700/70 dark:border-gray-600/50 rounded-xl sm:rounded-2xl p-3 xs:p-4 sm:p-5 md:p-6 lg:p-8 shadow-2xl ring-1 ring-gray-800/50 dark:ring-gray-700/50">
@@ -106,23 +116,23 @@ export default function Home() {
                   <Link href="/role-selection" className="flex-1 xs:flex-none">
                     <Button size="lg" className="h-12 sm:h-14 px-6 sm:px-8 font-semibold w-full xs:w-auto bg-primary hover:bg-primary/90 shadow-lg text-base active:scale-[0.98] touch-manipulation" data-testid="button-get-started">
               Get Started
-            </Button>
-          </Link>
+                    </Button>
+                  </Link>
           <Link href="/login" className="flex-1 xs:flex-none">
-            <Button
-              variant="outline"
-              size="lg"
+                  <Button
+                    variant="outline"
+                    size="lg"
                       className="h-12 sm:h-14 px-6 sm:px-8 font-semibold w-full xs:w-auto border-white/40 text-white hover:bg-white/10 hover:text-white hover:border-white/60 text-base active:scale-[0.98] touch-manipulation"
               data-testid="button-sign-in"
-            >
+                  >
               Sign In
-            </Button>
+                  </Button>
           </Link>
-        </div>
+                </div>
               </div>
             </div>
           </section>
-      </div>
+        </div>
 
       {/* Features - Responsive grid */}
       <div className="px-3 sm:px-4 py-12 sm:py-16 md:py-24 bg-muted/50 dark:bg-muted/30">
