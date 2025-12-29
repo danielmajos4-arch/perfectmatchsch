@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,7 +14,6 @@ const heroVideoUrl = '/videos/hero-video.mp4';
 export default function Home() {
   const [, setLocation] = useLocation();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   // Secret admin access: Shift + Cmd/Ctrl + A
   useEffect(() => {
@@ -42,17 +41,10 @@ export default function Home() {
       });
     };
 
-    const handlePlaying = () => {
-      // Video is now actually playing, show it
-      setIsVideoPlaying(true);
-    };
-
     video.addEventListener('canplay', handleCanPlay);
-    video.addEventListener('playing', handlePlaying);
 
     return () => {
       video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('playing', handlePlaying);
     };
   }, []);
 
@@ -71,9 +63,7 @@ export default function Home() {
                 loop
                 muted
                 playsInline
-                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
-                  isVideoPlaying ? 'opacity-100' : 'opacity-0'
-                }`}
+                className="absolute inset-0 w-full h-full object-cover"
                 preload="auto"
                 aria-label="Hero background video"
               >
