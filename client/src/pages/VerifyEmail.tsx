@@ -14,47 +14,57 @@ export default function VerifyEmail() {
     const stateEmail = locationState.email;
     const stateRole = locationState.role;
 
-    const [email, setEmail] = useState(stateEmail || '');
-    const [role, setRole] = useState(stateRole || '');
+    // Initialize email synchronously from sessionStorage first (fast path)
+    const getInitialEmail = () => {
+        // Try location state first
+        if (stateEmail) return { email: stateEmail, role: stateRole || '' };
+        
+        // Then try sessionStorage (synchronous, no delay)
+        const pendingData = sessionStorage.getItem('pendingVerification');
+        if (pendingData) {
+            try {
+                const data = JSON.parse(pendingData);
+                console.log('[VerifyEmail] Found pending verification data:', data);
+                return { email: data.email, role: data.role || '' };
+            } catch (err) {
+                console.error('[VerifyEmail] Failed to parse pending verification data:', err);
+            }
+        }
+        
+        return { email: '', role: '' };
+    };
+
+    const initialData = getInitialEmail();
+    const [email, setEmail] = useState(initialData.email);
+    const [role, setRole] = useState(initialData.role);
     const [otp, setOtp] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isInitializing, setIsInitializing] = useState(!initialData.email);
 
     const { toast } = useToast();
 
+    // Only use async fallback if email is still not found (runs once on mount)
     useEffect(() => {
-        const initializeEmail = async () => {
-            if (!email) {
-                // First, try to read from sessionStorage (set during registration)
-                const pendingData = sessionStorage.getItem('pendingVerification');
-                if (pendingData) {
-                    try {
-                        const data = JSON.parse(pendingData);
-                        console.log('[VerifyEmail] Found pending verification data:', data);
-                        setEmail(data.email);
-                        setRole(data.role);
-                        // Don't remove yet - keep it until verification succeeds
-                        return;
-                    } catch (err) {
-                        console.error('[VerifyEmail] Failed to parse pending verification data:', err);
-                    }
-                }
-
-                // Fallback: try to get current user
+        if (!email && isInitializing) {
+            const initializeEmail = async () => {
+                // Fallback: try to get current user (only if sessionStorage was empty)
                 const { data } = await supabase.auth.getUser();
                 if (data.user?.email) {
                     console.log('[VerifyEmail] Using current user email:', data.user.email);
                     setEmail(data.user.email);
                     setRole(data.user.user_metadata?.role || '');
+                    setIsInitializing(false);
                 } else {
                     // No user found and no pending data, redirect to login
                     console.log('[VerifyEmail] No email found, redirecting to login');
                     setLocation('/login');
                 }
-            }
-        };
+            };
 
-        initializeEmail();
-    }, [email, setLocation]);
+            initializeEmail();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount - email and isInitializing are checked inside
 
 
 
@@ -193,7 +203,8 @@ export default function VerifyEmail() {
         }
     };
 
-    if (!email) {
+    // Only show loading if we're still initializing and don't have email
+    if (isInitializing && !email) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

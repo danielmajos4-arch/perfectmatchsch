@@ -125,8 +125,16 @@ export function classifyAuthError(error: unknown): AuthErrorType {
     return AuthErrorType.INVALID_CREDENTIALS;
   }
 
-  // User already exists
-  if (message.includes('already registered') || message.includes('already exists')) {
+  // User already exists - check for various Supabase error patterns
+  if (
+    message.includes('already registered') ||
+    message.includes('already exists') ||
+    message.includes('user already registered') ||
+    message.includes('email address is already registered') ||
+    message.includes('user with this email already exists') ||
+    message.includes('duplicate key value') ||
+    (message.includes('email') && message.includes('already') && message.includes('registered'))
+  ) {
     return AuthErrorType.USER_EXISTS;
   }
 

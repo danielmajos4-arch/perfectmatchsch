@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, InfoIcon } from 'lucide-react';
-import { withTimeout, getAuthErrorMessage } from '@/lib/authUtils';
+import { withTimeout, getAuthErrorMessage, classifyAuthError, AuthErrorType } from '@/lib/authUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { validatePasswordStrength } from '@/lib/passwordValidation';
@@ -183,6 +183,33 @@ export default function Register() {
 
       if (authError) {
         console.error('[Register] Signup error:', authError);
+        
+        // Check if error indicates user already exists
+        const errorType = classifyAuthError(authError);
+        const errorMessage = authError.message?.toLowerCase() || '';
+        const isUserExists = 
+          errorType === AuthErrorType.USER_EXISTS ||
+          errorMessage.includes('already registered') ||
+          errorMessage.includes('user already registered') ||
+          errorMessage.includes('email address is already registered') ||
+          errorMessage.includes('user with this email already exists');
+
+        if (isUserExists) {
+          // Show message and redirect after 3 seconds
+          toast({
+            title: 'Account already exists',
+            description: 'An account with this email already exists. Redirecting to sign in...',
+          });
+
+          setIsLoading(false);
+          
+          setTimeout(() => {
+            setLocation(`/login?email=${encodeURIComponent(formData.email)}`);
+          }, 3000);
+          
+          return;
+        }
+        
         throw authError;
       }
 

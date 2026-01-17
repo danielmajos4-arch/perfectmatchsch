@@ -33,6 +33,15 @@ export default function Login() {
     }
   }, [user, loading, setLocation]);
 
+  // Read email from URL query parameter on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailParam = urlParams.get('email');
+    if (emailParam) {
+      setEmail(emailParam);
+    }
+  }, []);
+
   // If user is authenticated, return null while redirect happens
   // Don't show a blocking "Redirecting..." spinner that can get stuck
   if (user) {
